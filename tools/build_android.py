@@ -1,4 +1,4 @@
-"""Build the native Java test APK; all dependencies and outputs stay on E:."""
+"""Build the native Java APK; all dependencies and outputs stay on E:."""
 import hashlib
 import os
 import shutil
@@ -97,7 +97,7 @@ def main():
                 import io
                 with zipfile.ZipFile(io.BytesIO(original)) as upstream, zipfile.ZipFile(LIBS / 'libadb.jar', 'w', zipfile.ZIP_DEFLATED) as patched:
                     for member in upstream.namelist():
-                        if not member.startswith('io/github/muntashirakon/adb/AdbProtocol'):
+                        if not any(member.startswith('io/github/muntashirakon/adb/' + patched_class) for patched_class in ('AdbProtocol', 'AdbStream', 'AdbInputStream')):
                             patched.writestr(member, upstream.read(member))
             else:
                 (LIBS / (name + '.jar')).write_bytes(original)
@@ -111,7 +111,10 @@ def main():
         '-A', ROOT / 'android/assets', compiled)
     jars = sorted(LIBS.glob('*.jar'))
     classpath = os.pathsep.join(str(x) for x in [android] + jars)
-    sources = sorted((ROOT / 'android/src').rglob('*.java')) + sorted((ROOT / 'android/generated').rglob('*.java'))
+    manifest_root = ET.parse(ROOT / 'android/AndroidManifest.xml').getroot()
+    debug = manifest_root.find('application').get('{http://schemas.android.com/apk/res/android}debuggable') == 'true'
+    sources = [path for path in sorted((ROOT / 'android/src').rglob('*.java'))
+               if debug or not path.name.endswith('TestInstrumentation.java')] + sorted((ROOT / 'android/generated').rglob('*.java'))
     run(JAVAC, '--release', '8', '-encoding', 'UTF-8', '-cp', classpath, '-d', BUILD / 'classes', *sources)
     classes_jar = BUILD / 'classes.jar'
     with zipfile.ZipFile(classes_jar, 'w', zipfile.ZIP_DEFLATED) as z:

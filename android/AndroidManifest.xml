@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="8" android:versionName="0.3.3-test">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="11" android:versionName="1.0.0">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
   <uses-permission android:name="android.permission.INTERNET" />
@@ -11,7 +11,7 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
   <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
   <queries><package android:name="moe.shizuku.privileged.api" /><package android:name="me.mugzone.emiria" /></queries>
-  <application android:label="Malody Link" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:debuggable="true" android:usesCleartextTraffic="true" android:extractNativeLibs="true" android:icon="@drawable/icon">
+  <application android:label="Malody Link" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:debuggable="false" android:usesCleartextTraffic="true" android:extractNativeLibs="true" android:icon="@drawable/icon">
     <meta-data android:name="moe.shizuku.client.V3_SUPPORT" android:value="true" />
     <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="cn.gmiya.malodylink.shizuku" android:multiprocess="false" android:enabled="true" android:exported="true" android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     <activity android:name=".MainActivity" android:exported="true">
@@ -19,11 +19,8 @@
     </activity>
     <activity android:name=".InternalReaderActivity" android:exported="false" />
     <service android:name=".PairingService" android:exported="false" android:foregroundServiceType="connectedDevice" />
+    <service android:name=".LocalSyncService" android:exported="false" android:foregroundServiceType="connectedDevice" />
     <receiver android:name=".PairCodeReceiver" android:exported="false" />
     <activity android:name=".PosterActivity" android:exported="true" />
   </application>
-  <instrumentation android:name=".SelfTestInstrumentation" android:targetPackage="cn.gmiya.malodylink" android:label="Malody Link device checks" />
-  <instrumentation android:name=".PosterTestInstrumentation" android:targetPackage="cn.gmiya.malodylink" android:label="Score poster checks" />
-  <instrumentation android:name=".InternalReaderTestInstrumentation" android:targetPackage="cn.gmiya.malodylink" />
-  <instrumentation android:name=".ConnectionUiTestInstrumentation" android:targetPackage="cn.gmiya.malodylink" />
 </manifest>

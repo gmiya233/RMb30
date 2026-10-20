@@ -3,7 +3,7 @@ Malody Link internal reader dependencies
 LibADB Android 3.1.1, Copyright Muntashir Al-Islam, Apache-2.0 option selected.
 Source: https://github.com/MuntashirAkon/libadb-android/tree/3.1.1
 Additional notices: https://github.com/MuntashirAkon/libadb-android/tree/3.1.1/LICENSES
-Local modification: AdbProtocol.generateOpen sizes the destination by UTF-8 bytes instead of UTF-16 characters, fixing Chinese/emoji paths. AndroidX annotation metadata removed from this vendored class. All other LibADB classes are unmodified. Modified source: android/src/io/github/muntashirakon/adb/AdbProtocol.java in this project's source tree. AdbProtocol also retains Cameron Gutman's BSD-3-Clause copyright notice.
+Local modification: AdbProtocol.generateOpen sizes the destination by UTF-8 bytes instead of UTF-16 characters, fixing Chinese/emoji paths. AndroidX annotation metadata removed from this vendored class. Additional local modifications: AdbStream drains queued and buffered bytes before reporting peer EOF and wakes readers on closure; AdbInputStream delegates EOF to the stream and returns unsigned single bytes. Source files are adjacent to AdbProtocol.java. All remaining LibADB classes are unmodified. Modified source: android/src/io/github/muntashirakon/adb/AdbProtocol.java in this project's source tree. AdbProtocol also retains Cameron Gutman's BSD-3-Clause copyright notice.
 
 spake2-java / spake2-android 2.2.1, LGPL-3.0-or-later.
 Source and build instructions: https://github.com/MuntashirAkon/spake2-java/tree/2.2.1

@@ -57,28 +57,50 @@ public final class InternalAdb extends AbsAdbConnectionManager {
         if(!chart&&!(path.startsWith(root+"/replay/")&&path.endsWith(".mrv")))throw new SecurityException("只允许读取Malody谱面、曲绘和回放");return path;
     }
     private static String quote(String s){return "'"+s.replace("'","'\"'\"'")+"'";}
+    public static final class TransportException extends IOException {
+        TransportException(String message,Throwable cause){super(message,cause);}
+    }
+    private static final class ReadFailure extends IOException {
+        ReadFailure(String message){super(message);}
+    }
     private byte[] command(String cmd,int limit)throws Exception {
-        AdbConnection connection=getAdbConnection();if(connection==null||!isConnected())throw new IOException("请先连接本机读取");
-        ScheduledFuture<?> watchdog=timer.schedule(()->{try{connection.close();}catch(Exception ignored){}},30,TimeUnit.SECONDS);
+        AdbConnection connection=getAdbConnection();
+        if(connection==null||!isConnected())throw new TransportException("本机连接已断开",null);
+        java.util.concurrent.atomic.AtomicBoolean timedOut=new java.util.concurrent.atomic.AtomicBoolean();
+        ScheduledFuture<?> watchdog=timer.schedule(()->{timedOut.set(true);try{connection.close();}catch(Exception ignored){}},30,TimeUnit.SECONDS);
         try(AdbStream stream=openStream("shell,v2,raw:"+cmd);InputStream in=stream.openInputStream()){
-            ByteArrayOutputStream stdout=new ByteArrayOutputStream(),stderr=new ByteArrayOutputStream();boolean exited=false;
-            for(;;){int channel=in.read();if(channel<0)break;byte[] header=exact(in,4);long length=0;for(int i=0;i<4;i++)length|=(long)(header[i]&255)<<(8*i);if(length>33554432)throw new IOException("读取数据过大");
+            ByteArrayOutputStream stdout=new ByteArrayOutputStream(),stderr=new ByteArrayOutputStream();
+            for(;;){
+                int channel=in.read();if(channel<0)throw new EOFException("未收到文件读取结束标记");
+                byte[] header=exact(in,4);long length=0;for(int i=0;i<4;i++)length|=(long)(header[i]&255)<<(8*i);
+                if(length>33554432)throw new ReadFailure("读取数据过大");
                 byte[] payload=exact(in,(int)length);
-                if(channel==1){if(stdout.size()+payload.length>limit)throw new IOException("文件超出读取上限");stdout.write(payload);}
-                else if(channel==2){if(stderr.size()+payload.length>8192)throw new IOException("读取错误");stderr.write(payload);}
-                else if(channel==3){if(payload.length<1||payload[0]!=0)throw new IOException("Malody文件读取失败："+new String(stderr.toByteArray(),StandardCharsets.UTF_8));exited=true;break;}
-                else throw new IOException("无法识别的读取响应");
+                if(channel==1){if(stdout.size()+payload.length>limit)throw new ReadFailure("文件超出读取上限");stdout.write(payload);}
+                else if(channel==2){if(stderr.size()+payload.length>8192)throw new ReadFailure("文件读取错误信息过长");stderr.write(payload);}
+                else if(channel==3){
+                    if(payload.length!=1||payload[0]!=0)throw new ReadFailure("Malody文件读取失败："+new String(stderr.toByteArray(),StandardCharsets.UTF_8));
+                    return stdout.toByteArray();
+                }else throw new ReadFailure("无法识别的读取响应");
             }
-            if(!exited)throw new IOException("读取连接中断，请重新连接");return stdout.toByteArray();
-        }finally{watchdog.cancel(false);}
+        }catch(ReadFailure e){throw e;}
+        catch(IOException e){throw new TransportException(timedOut.get()?"文件读取超时":"文件传输中断",e);}
+        finally{watchdog.cancel(false);}
     }
     private static byte[] exact(InputStream in,int size)throws IOException {byte[] b=new byte[size];int offset=0;while(offset<size){int n=in.read(b,offset,size-offset);if(n<0)throw new EOFException("读取响应不完整");offset+=n;}return b;}
     public Engine.Reader reader(){return new Engine.Reader(){
+        private final Map<String,String> stamps=new HashMap<>();
+        public String fingerprint(String path){return stamps.getOrDefault(path, "");}
         public List<String> list(String type)throws Exception {
             if(!type.equals("chart")&&!type.equals("replay"))throw new SecurityException("无效目录");
             String dir=ReadOnlyService.ROOT+"/"+type,suffix=type.equals("chart")?"*.mc":"*.mrv";
-            byte[] bytes=command("[ -d "+quote(dir)+" ] && find "+quote(dir)+" -maxdepth 13 -type f -name "+quote(suffix)+" -print0",8000000);
-            List<String> paths=new ArrayList<>();for(String path:new String(bytes,StandardCharsets.UTF_8).split("\u0000")){if(path.isEmpty())continue;paths.add(allowedPath(path));if(paths.size()>20000)throw new IOException("文件数量超过读取上限");}return paths;
+            byte[] bytes=command("[ -d "+quote(dir)+" ] && find "+quote(dir)+" -maxdepth 13 -type f -name "+quote(suffix)+" -exec stat -c '%s:%Y:%Z:%n' {} +",8000000);
+            List<String> paths=new ArrayList<>();
+            for(String row:new String(bytes,StandardCharsets.UTF_8).split("\n")){
+                if(row.isEmpty())continue;String[] fields=row.split(":",4);
+                if(fields.length!=4||!fields[0].matches("[0-9]+")||!fields[1].matches("[0-9]+")||!fields[2].matches("[0-9]+"))throw new IOException("目录索引格式异常");
+                String path=allowedPath(fields[3]);paths.add(path);stamps.put(path,fields[0]+":"+fields[1]+":"+fields[2]);
+                if(paths.size()>20000)throw new IOException("文件数量超过读取上限");
+            }return paths;
         }
         public byte[] file(String path)throws Exception {
             String p=quote(allowedPath(path)),root=quote(ReadOnlyService.ROOT);

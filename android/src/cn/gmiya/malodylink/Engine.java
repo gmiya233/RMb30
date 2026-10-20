@@ -77,13 +77,14 @@ public final class Engine {
             JSONArray valid=new JSONArray();for(int i=0;i<scores.length();i++){JSONObject s=scores.getJSONObject(i);if(active(s.optInt("cid"),s.optString("server_hash")))valid.put(s);}scores=valid;save("scores.json",scores);
         }finally{if(temp.exists())temp.delete();}
     }
-    public interface Reader {List<String> list(String type)throws Exception;byte[] file(String path)throws Exception;}
+    public interface Reader {List<String> list(String type)throws Exception;byte[] file(String path)throws Exception;default String fingerprint(String path)throws Exception{return "";}}
     public static Reader binderReader(IBinder binder){return new Reader(){
         public List<String> list(String type)throws Exception {Parcel in=Parcel.obtain(),out=Parcel.obtain();try{in.writeInterfaceToken(ReadOnlyService.DESCRIPTOR);in.writeString(type);binder.transact(1,in,out,0);out.readException();return out.createStringArrayList();}finally{in.recycle();out.recycle();}}
         public byte[] file(String path)throws Exception {ByteArrayOutputStream bytes=new ByteArrayOutputStream();for(long offset=0;;offset+=262144){Parcel in=Parcel.obtain(),out=Parcel.obtain();byte[] b;try{in.writeInterfaceToken(ReadOnlyService.DESCRIPTOR);in.writeString(path);in.writeLong(offset);in.writeInt(262144);binder.transact(2,in,out,0);out.readException();b=out.createByteArray();}finally{in.recycle();out.recycle();}if(bytes.size()+b.length>33554432)throw new IOException("文件超出限制");bytes.write(b);if(b.length<262144)return bytes.toByteArray();}}
     };}
     private JSONObject allowed(String md5){JSONObject a=aliases.optJSONObject(md5);return a!=null&&active(a.optInt("cid"),a.optString("server_hash"))?a:null;}
     private void cacheLocalJacket(Reader reader,String path,byte[] local,int cid){
+        if(new File(context.getFilesDir(),"jackets/"+cid+".img").length()>0)return;
         try{JSONObject meta=new JSONObject(new String(local,StandardCharsets.UTF_8)).getJSONObject("meta");for(String key:new String[]{"cover","background"}){
             String name=meta.optString(key,"");if(name.isEmpty())continue;try{byte[] data=reader.file(path.substring(0,path.lastIndexOf('/')+1)+name);if(data.length==0||data.length>8000000)continue;
                 File folder=new File(context.getFilesDir(),"jackets");folder.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(folder,cid+".img"))){out.write(data);}return;
@@ -104,18 +105,46 @@ public final class Engine {
                 if(ChartMatcher.catalogMatches(local,basename,candidate)){if(match!=null&&match.optInt("cid")!=candidate.optInt("cid")){ambiguous=true;break;}match=candidate;}
             }
             if(match!=null&&!ambiguous){aliases.put(md5,new JSONObject(match.toString()).put("verification","catalog_identity").put("local_md5",md5));cacheLocalJacket(reader,path,local,match.optInt("cid"));verified++;}
-          } catch(Exception unsupported) { failed++; }
+          } catch(InternalAdb.TransportException disconnected) { throw disconnected; }
+          catch(Exception unsupported) { failed++; }
         }
         save("aliases.json",aliases);
-        List<String> replays=reader.list("replay");int imported=0,skipped=0;Collections.sort(replays);
-        for(String path:replays){progress.update("筛选回放 "+(imported+skipped+1)+" / "+replays.size());if(importReplay(reader.file(path)))imported++;else skipped++;}
-        return "目录匹配 "+verified+" 张谱面；收录/更新 "+imported+" 条成绩；跳过 "+skipped+" 份回放。"+(failed>0?" "+failed+" 张谱面未能识别，已排除。":"");
+        List<String> replays=reader.list("replay");Collections.sort(replays);
+        JSONObject index=load("replay-index.json",new JSONObject());
+        // Changes in either the catalogue, aliases, or stored scores invalidate skip decisions.
+        String revision=ChartMatcher.md5((server+ChartMatcher.canonical(charts())+ChartMatcher.canonical(aliases)).getBytes(StandardCharsets.UTF_8));
+        String scoreRevision=ChartMatcher.md5(scores.toString().getBytes(StandardCharsets.UTF_8));
+        if(!revision.equals(index.optString("revision"))||!scoreRevision.equals(index.optString("scores")))index=new JSONObject();
+        JSONObject files=index.optJSONObject("files");if(files==null)files=new JSONObject();
+        int imported=0,skipped=0,cached=0,invalid=0;
+        try{
+            for(int i=0;i<replays.size();i++){
+                String path=replays.get(i),stamp=reader.fingerprint(path);
+                progress.update("读取成绩 "+(i+1)+" / "+replays.size()+" · 已收录 "+imported+" 条");
+                if(!stamp.isEmpty()&&stamp.equals(files.optString(path))){cached++;continue;}
+                byte[] raw=reader.file(path); // Transport/storage failures must never be treated as malformed replays.
+                try{if(importReplay(raw))imported++;else skipped++;}
+                catch(InvalidReplayException malformed){invalid++;continue;}
+                if(!stamp.isEmpty())files.put(path,stamp);
+            }
+        }finally{
+            JSONObject present=new JSONObject();for(String path:replays)if(files.has(path))present.put(path,files.get(path));
+            save("replay-index.json",new JSONObject().put("revision",revision).put("scores",ChartMatcher.md5(scores.toString().getBytes(StandardCharsets.UTF_8))).put("files",present));
+        }
+        return "同步完成：收录 "+imported+" 条，已检查未变化 "+cached+" 份，未收录或重复 "+skipped+" 份。"+
+            (invalid>0?" "+invalid+" 份回放无法解析，已跳过。":"")+(failed>0?" "+failed+" 张谱面未能识别。":"");
+    }
+    public static final class InvalidReplayException extends IOException {
+        InvalidReplayException(IOException cause){super("回放数据无法解析",cause);}
     }
     public boolean importReplay(byte[] raw)throws Exception {
-        String hash=Proto.replayHash(raw);JSONObject chart=allowed(hash);if(chart==null)return false;
-        // Only an allowlisted chart reaches score interpretation/storage.
-        List<Proto.Field> replay=Proto.decode(raw);Object data=Proto.get(replay,8);if(!(data instanceof byte[]))throw new IOException("回放缺少成绩信息");
-        List<Proto.Field> score=Proto.decode((byte[])data);long timestamp=Proto.integer(score,12);
+        String hash;JSONObject chart;List<Proto.Field> replay,score;long timestamp;
+        try{
+            hash=Proto.replayHash(raw);chart=allowed(hash);if(chart==null)return false;
+            replay=Proto.decode(raw);Object data=Proto.get(replay,8);
+            if(!(data instanceof byte[]))throw new IOException("回放缺少成绩信息");
+            score=Proto.decode((byte[])data);timestamp=Proto.integer(score,12);
+        }catch(IOException malformed){throw new InvalidReplayException(malformed);}
         String id=chart.getInt("cid")+":"+timestamp+":"+ChartMatcher.md5(raw);
         for(int i=0;i<scores.length();i++)if(id.equals(scores.getJSONObject(i).optString("id")))return false;
         JSONObject item=new JSONObject().put("id",id).put("cid",chart.getInt("cid")).put("server_hash",chart.getString("server_hash"))
