@@ -1,0 +1,17 @@
+.server-inspection/
+device-inspection/
+tools/python-libs/
+__pycache__/
+.cache/
+.venv/
+build/
+dist/
+tools/android-sdk/
+tools/android-libs/
+tools/test-libs/
+.secrets/
+android/assets/catalog.json
+android/assets/aliases.json
+android/assets/default-reader.json
+android/generated/
+*.class
