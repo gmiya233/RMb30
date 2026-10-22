@@ -14,6 +14,7 @@ import java.util.*;
 public final class Engine {
     public interface Progress {void update(String text);}
     private final Context context;
+    public final String profile;
     public JSONObject catalog,aliases;
     public JSONArray scores;
     // Shared only inside the current app process, never persisted or sent through intents.
@@ -21,7 +22,7 @@ public final class Engine {
     private String token="";
     public String server="http://47.111.184.207:5244";
     public Engine(Context ctx)throws Exception {
-        context=ctx;server=ctx.getSharedPreferences("settings",0).getString("server",server);
+        context=ctx;profile=ScoreStore.profile(ctx);server=ctx.getSharedPreferences("settings",0).getString("server",server);
         String session=sessionTokens.get(server);if(session!=null)token=session;
         catalog=load("catalog.json",new JSONObject(new String(read(ctx.getAssets().open("catalog.json"),8000000),StandardCharsets.UTF_8)));
         aliases=load("aliases.json",new JSONObject());scores=loadArray("scores.json");
@@ -32,9 +33,9 @@ public final class Engine {
         try(InputStream in=stream;ByteArrayOutputStream out=new ByteArrayOutputStream()){
             byte[] b=new byte[16384];int n;while((n=in.read(b))!=-1){if(out.size()+n>maximum)throw new IOException("文件过大，已停止读取");out.write(b,0,n);}return out.toByteArray();}
     }
-    public JSONObject load(String name,JSONObject fallback)throws Exception {File f=new File(context.getFilesDir(),name);return f.exists()?new JSONObject(new String(read(new FileInputStream(f),16000000),StandardCharsets.UTF_8)):fallback;}
-    private JSONArray loadArray(String name)throws Exception {File f=new File(context.getFilesDir(),name);return f.exists()?new JSONArray(new String(read(new FileInputStream(f),16000000),StandardCharsets.UTF_8)):new JSONArray();}
-    private void save(String name,Object value)throws Exception {File tmp=new File(context.getFilesDir(),name+".tmp");try(FileOutputStream out=new FileOutputStream(tmp)){out.write(value.toString().getBytes(StandardCharsets.UTF_8));}if(!tmp.renameTo(new File(context.getFilesDir(),name)))throw new IOException("保存失败");}
+    public JSONObject load(String name,JSONObject fallback)throws Exception {File f=ScoreStore.file(context,profile,name);return ScoreStore.exists(f)?new JSONObject(new String(ScoreStore.read(f),StandardCharsets.UTF_8)):fallback;}
+    private JSONArray loadArray(String name)throws Exception {File f=ScoreStore.file(context,profile,name);return ScoreStore.exists(f)?new JSONArray(new String(ScoreStore.read(f),StandardCharsets.UTF_8)):new JSONArray();}
+    private void save(String name,Object value)throws Exception {ScoreStore.write(ScoreStore.file(context,profile,name),value);}
     public JSONArray charts(){return catalog.optJSONArray("charts");}
     public boolean active(int cid,String hash){JSONArray a=charts();for(int i=0;i<a.length();i++){JSONObject c=a.optJSONObject(i);if(c.optInt("cid")==cid&&c.optString("server_hash").equals(hash))return true;}return false;}
     private JSONObject request(String path,JSONObject data)throws Exception {return new JSONObject(new String(http(server+path,"POST",data.toString().getBytes(StandardCharsets.UTF_8),true,8000000),StandardCharsets.UTF_8));}
@@ -165,5 +166,5 @@ public final class Engine {
             else if(f.getName().matches("jacket_\\d+\\.img")){int cid=Integer.parseInt(f.getName().substring(7,f.getName().length()-4));boolean exists=false;for(int j=0;j<charts().length();j++)if(charts().getJSONObject(j).optInt("cid")==cid){exists=true;break;}if(exists){File jackets=new File(context.getFilesDir(),"jackets");jackets.mkdirs();File dest=new File(jackets,cid+".img");if(dest.exists())dest.delete();if(!f.renameTo(dest))throw new IOException("曲绘缓存失败");}else f.delete();}}
         save("scores.json",scores);manifest.delete();return count;
     }
-    public JSONObject export()throws Exception {JSONArray valid=new JSONArray();for(int i=0;i<scores.length();i++){JSONObject s=scores.getJSONObject(i);if(active(s.optInt("cid"),s.optString("server_hash")))valid.put(s);}return new JSONObject().put("schema",1).put("server",server).put("field_mapping_verified",false).put("scores",valid);}
+    public JSONObject export()throws Exception {JSONArray valid=new JSONArray();for(int i=0;i<scores.length();i++){JSONObject s=scores.getJSONObject(i);if(active(s.optInt("cid"),s.optString("server_hash")))valid.put(s);}return new JSONObject().put("schema",1).put("qq",profile).put("server",server).put("field_mapping_verified",false).put("scores",valid);}
 }

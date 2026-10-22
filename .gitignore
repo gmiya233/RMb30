@@ -13,5 +13,6 @@ tools/test-libs/
 android/assets/catalog.json
 android/assets/aliases.json
 android/assets/default-reader.json
+android/assets/default-rank.json
 android/generated/
 *.class

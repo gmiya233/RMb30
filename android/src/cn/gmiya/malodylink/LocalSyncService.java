@@ -13,7 +13,7 @@ public final class LocalSyncService extends Service {
     private boolean submitted;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     public static synchronized void request(Context c,int port){
-        if(active||LocalScoreSync.isBusy())return;
+        if(active||LocalScoreSync.isBusy()||CloudSyncService.active)return;
         active=true;
         try{c.startForegroundService(new Intent(c,LocalSyncService.class).putExtra("port",port));}
         catch(RuntimeException e){active=false;throw e;}

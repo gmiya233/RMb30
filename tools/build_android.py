@@ -69,6 +69,7 @@ def setup():
 
 def main():
     setup()
+    test_apk = '--test-apk' in sys.argv
     tools = SDK / 'build-tools/android-15'
     android = SDK / 'platforms/android-35/android.jar'
     for folder in (BUILD, DIST, BUILD / 'classes', BUILD / 'dex', ROOT / 'android/generated'):
@@ -82,6 +83,10 @@ def main():
     if not config.exists():
         raise RuntimeError('Missing private build configuration: .secrets/default-reader.json')
     shutil.copyfile(config, ROOT / 'android/assets/default-reader.json')
+    rank_config = ROOT / '.secrets/default-rank.json'
+    if not rank_config.exists():
+        raise RuntimeError('Missing private build configuration: .secrets/default-rank.json')
+    shutil.copyfile(rank_config, ROOT / 'android/assets/default-rank.json')
     extra = {
         'libadb': 'e6fcb495a20a507ca4a125afc9c554e838a84b3a15fbcc29f7deafd0f88bbb58',
         'spake2': '8798fb6c04b5d53a6307ed9481e9afe563227abd4e8b9e917c8514fa850071bb',
@@ -106,12 +111,22 @@ def main():
     compiled = BUILD / 'resources.zip' 
     run(tools / 'aapt2.exe', 'compile', '--dir', ROOT / 'android/res', '-o', compiled)
     resource_apk = BUILD / 'resources.apk'
+    manifest = ROOT / 'android/AndroidManifest.xml'
+    manifest_root = ET.parse(manifest).getroot()
+    if test_apk:
+        ns = '{http://schemas.android.com/apk/res/android}'
+        ET.register_namespace('android', 'http://schemas.android.com/apk/res/android')
+        manifest_root.find('application').set(ns + 'debuggable', 'true')
+        manifest_root.set(ns + 'versionName', manifest_root.get(ns + 'versionName') + '-test')
+        for source in (ROOT / 'android/src/cn/gmiya/malodylink').glob('*TestInstrumentation.java'):
+            ET.SubElement(manifest_root, 'instrumentation', {ns + 'name': '.' + source.stem, ns + 'targetPackage': 'cn.gmiya.malodylink'})
+        manifest = BUILD / 'test-manifest.xml'
+        ET.ElementTree(manifest_root).write(manifest, encoding='utf-8', xml_declaration=True)
     run(tools / 'aapt2.exe', 'link', '-o', resource_apk, '-I', android,
-        '--manifest', ROOT / 'android/AndroidManifest.xml', '--java', ROOT / 'android/generated',
+        '--manifest', manifest, '--java', ROOT / 'android/generated',
         '-A', ROOT / 'android/assets', compiled)
     jars = sorted(LIBS.glob('*.jar'))
     classpath = os.pathsep.join(str(x) for x in [android] + jars)
-    manifest_root = ET.parse(ROOT / 'android/AndroidManifest.xml').getroot()
     debug = manifest_root.find('application').get('{http://schemas.android.com/apk/res/android}debuggable') == 'true'
     sources = [path for path in sorted((ROOT / 'android/src').rglob('*.java'))
                if debug or not path.name.endswith('TestInstrumentation.java')] + sorted((ROOT / 'android/generated').rglob('*.java'))
@@ -142,7 +157,7 @@ def main():
         run(Path(JAVA).with_name('keytool.exe'), '-genkeypair', '-keystore', keystore,
             '-storepass', 'android', '-alias', 'androiddebugkey', '-keypass', 'android',
             '-dname', 'CN=Malody Link Test', '-keyalg', 'RSA', '-keysize', '2048', '-validity', '3650')
-    version = ET.parse(ROOT / 'android/AndroidManifest.xml').getroot().get('{http://schemas.android.com/apk/res/android}versionName')
+    version = manifest_root.get('{http://schemas.android.com/apk/res/android}versionName')
     apk = DIST / f'Malody-Link-{version}.apk'
     run(JAVA, '-jar', tools / 'lib/apksigner.jar', 'sign', '--ks', keystore,
         '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', apk, aligned)

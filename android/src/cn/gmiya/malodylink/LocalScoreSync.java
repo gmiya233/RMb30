@@ -7,9 +7,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Shared sync gate for the foreground service and first-pairing helper. */
 public final class LocalScoreSync {
     public static final String UPDATED="cn.gmiya.malodylink.LOCAL_SYNC_UPDATED";
-    private static final AtomicBoolean busy=new AtomicBoolean();
     public static volatile String currentProgress="";
-    public static boolean isBusy(){return busy.get();}
+    public static boolean isBusy(){return ScoreSyncGate.busy();}
     private static void connect(Context c,InternalAdb adb,int manualPort)throws Exception {
         if(adb.isConnected())return;
         int port=manualPort;
@@ -46,7 +45,7 @@ public final class LocalScoreSync {
         };
     }
     public static String run(Context context,int manualPort,Engine.Progress callback)throws Exception {
-        if(!busy.compareAndSet(false,true))throw new IllegalStateException("正在同步成绩，请稍候");
+        if(!ScoreSyncGate.enter("local"))throw new IllegalStateException("正在同步成绩，请稍候");
         Engine.Progress progress=text->{currentProgress=text;callback.update(text);};
         try{
             InternalAdb adb=InternalAdb.get(context);progress.update("正在连接本机读取…");connect(context,adb,manualPort);
@@ -55,12 +54,13 @@ public final class LocalScoreSync {
             Engine engine=new Engine(context);String warning="";
             try{DefaultCatalog.refresh(context,engine,false,progress);}catch(Exception updateFailed){warning="谱库更新未完成，暂按缓存目录筛选。";}
             progress.update("正在检查本机谱面…");String result=warning+engine.scan(recovering(context,adb,progress),progress);
+            if(CloudScoreSync.automatic(context))try{result+="\n"+CloudScoreSync.merge(context,engine,true,progress);}catch(Exception cloudFailed){result+="\n本机成绩已保存；云端未完成，可在首页重试。";}
             context.getSharedPreferences("reader",0).edit().putLong("last_sync",System.currentTimeMillis()).putString("last_result",result).putBoolean("last_ok",true).apply();
             return result;
         }catch(Exception e){
             SharedPreferences.Editor edit=context.getSharedPreferences("reader",0).edit().putBoolean("last_ok",false).putString("last_result",friendly(e));
             if(authentication(e))edit.putBoolean("paired",false);edit.apply();throw e;
-        }finally{currentProgress="";busy.set(false);context.sendBroadcast(new Intent(UPDATED).setPackage(context.getPackageName()));}
+        }finally{currentProgress="";ScoreSyncGate.leave("local");context.sendBroadcast(new Intent(UPDATED).setPackage(context.getPackageName()));}
     }
     public static String friendly(Throwable error){
         if(authentication(error))return "系统配对授权已失效，请重新配对；已收录成绩保留。";
