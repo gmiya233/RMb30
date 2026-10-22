@@ -71,7 +71,7 @@ python tools/prepare_usb_sync.py --prepare-only
 python tools/build_android.py
 ```
 
-APK 输出到 `dist/Malody-Link-1.2.0.apk`。内置服务器谱面目录快照和示例曲绘，不包含测试玩家成绩、GMIYA账号密码或登录令牌。按用户授权打包的 Data1 只读配置和 Rank1 成绩目录配置分别来自被 Git 忽略的 `.secrets/default-reader.json`、`.secrets/default-rank.json`，构建时复制到被忽略的对应 assets 文件。默认账号可从 APK 提取；Data1 应仅能读取数据库，Rank1 应限定在 RMB30 目录。不要将这些私有配置提交到 Git。
+APK 输出到 `dist/Malody-Link-1.2.0.APK`。内置服务器谱面目录快照和示例曲绘，不包含测试玩家成绩、GMIYA账号密码或登录令牌。按用户授权打包的 Data1 只读配置和 Rank1 成绩目录配置分别来自被 Git 忽略的 `.secrets/default-reader.json`、`.secrets/default-rank.json`，构建时复制到被忽略的对应 assets 文件。默认账号可从 APK 提取；Data1 应仅能读取数据库，Rank1 应限定在 RMB30 目录。不要将这些私有配置提交到 Git。
 
 ## O20 + N10 成绩图
 

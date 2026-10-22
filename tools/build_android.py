@@ -110,7 +110,7 @@ def main():
         raise RuntimeError('Bouncy Castle checksum mismatch')
     compiled = BUILD / 'resources.zip' 
     run(tools / 'aapt2.exe', 'compile', '--dir', ROOT / 'android/res', '-o', compiled)
-    resource_apk = BUILD / 'resources.apk'
+    resource_apk = BUILD / 'resources.APK'
     manifest = ROOT / 'android/AndroidManifest.xml'
     manifest_root = ET.parse(manifest).getroot()
     if test_apk:
@@ -137,7 +137,7 @@ def main():
             z.write(path, path.relative_to(BUILD / 'classes').as_posix())
     run(JAVA, '-cp', tools / 'lib/d8.jar', 'com.android.tools.r8.D8',
         '--lib', android, '--min-api', '26', '--output', BUILD / 'dex', classes_jar, *jars)
-    unaligned = BUILD / 'unaligned.apk'
+    unaligned = BUILD / 'unaligned.APK'
     shutil.copyfile(resource_apk, unaligned)
     with zipfile.ZipFile(unaligned, 'a', zipfile.ZIP_DEFLATED) as z:
         for name in extra:
@@ -148,7 +148,7 @@ def main():
         for p in (BUILD / 'dex').glob('*.dex'):
 
             z.write(p, p.name)
-    aligned = BUILD / 'aligned.apk'
+    aligned = BUILD / 'aligned.APK'
     run(tools / 'zipalign.exe', '-f', '-p', '4', unaligned, aligned)
     keys = ROOT / '.secrets'
     keys.mkdir(exist_ok=True)
@@ -158,7 +158,7 @@ def main():
             '-storepass', 'android', '-alias', 'androiddebugkey', '-keypass', 'android',
             '-dname', 'CN=Malody Link Test', '-keyalg', 'RSA', '-keysize', '2048', '-validity', '3650')
     version = manifest_root.get('{http://schemas.android.com/apk/res/android}versionName')
-    apk = DIST / f'Malody-Link-{version}.apk'
+    apk = DIST / f'Malody-Link-{version}.APK'
     run(JAVA, '-jar', tools / 'lib/apksigner.jar', 'sign', '--ks', keystore,
         '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', apk, aligned)
     run(JAVA, '-jar', tools / 'lib/apksigner.jar', 'verify', '--verbose', apk)
