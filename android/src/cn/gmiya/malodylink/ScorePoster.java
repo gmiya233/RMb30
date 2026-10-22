@@ -57,6 +57,7 @@ public final class ScorePoster {
         rect(x+3,y+6,268,158,0x203f75a0,9);rect(x,y,268,158,e==null?0xb5ffffff:0xfaffffff,9);
         if(e==null){rect(x+13,y+17,81,81,0xffe0eef2,6);text("♪",x+36,y+75,49,0xffabc9d0,true);text("待收录",x+110,y+52,23,0xff69869a,true);text(String.format(Locale.ROOT,"SLOT %02d",index),x+110,y+82,16,0xff859ca9,false);text("完成游玩后收录最佳成绩",x+14,y+130,18,0xff7d96a6,false);return;}
         cover(e.cid,x+12,y+16,82,accent);rect(x+12,y+16,31,22,accent,4);text(String.format(Locale.ROOT,"%02d",index),x+16,y+33,15,Color.WHITE,true);
+        ChartKeyBadge.draw(c,context,e.keys,new RectF(x+44,y+73,x+94,y+98));
         text(fit(e.title,20,150),x+106,y+36,20,NAVY,true);
         double displayLevel=e.displayLevel();
         String level=Double.isFinite(displayLevel)?String.format(Locale.ROOT,"Lv.%s",displayLevel%1==0?Integer.toString((int)displayLevel):Double.toString(displayLevel)):"待定级";

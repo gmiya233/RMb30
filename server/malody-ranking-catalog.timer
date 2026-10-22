@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh leaderboard catalogue every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=malody-ranking-catalog.service
+
+[Install]
+WantedBy=timers.target

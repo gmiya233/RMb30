@@ -1,0 +1,13 @@
+[Unit]
+Description=Refresh Malody ranking catalogue from read-only database
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -B /opt/malody-ranking/launch.py export
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/malody-ranking
+CapabilityBoundingSet=

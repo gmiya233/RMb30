@@ -1,0 +1,24 @@
+[Unit]
+Description=Malody comments and community leaderboards
+After=malody-ranking.service
+Wants=malody-ranking.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -B /opt/malody-ranking/community.py
+Restart=on-failure
+RestartSec=10
+UMask=0022
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/malody-ranking/community
+# Installer permits derived community output and mounts review originals read-only.
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+MemoryMax=384M
+
+[Install]
+WantedBy=multi-user.target

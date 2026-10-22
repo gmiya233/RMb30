@@ -20,7 +20,15 @@ public final class RankingRepository {
     public static Snapshot refresh(Context c,Engine engine,boolean force,int cid,Engine.Progress progress)throws Exception{synchronized(LOCK){
         File target=file(c,engine,cid);Snapshot previous=read(target);if(!force&&previous!=null&&!previous.stale&&System.currentTimeMillis()-previous.updated<300000)return previous;
         if(!engine.server.equals(RankConnection.config(c).getString("server")))throw new IOException("当前谱库不属于此云端排行榜服务器");
-        String revision=RankingIndex.revision(engine.server,engine.charts());RankingIndex.Remote source=new OpenListRankingRemote(RankConnection.open(c));List<String> ids=source.directories(RankingIndex.board(revision,cid));Snapshot result=new Snapshot();result.cid=cid;result.folders=ids.size();Map<String,RankingData.Player> fallback=new HashMap<>();if(previous!=null)for(RankingData.Player p:previous.players)fallback.put(p.qq,p);
+        String revision=RankingIndex.revision(engine.server,engine.charts());OpenListScoreRemote connection=RankConnection.open(c);
+        progress.update("读取服务器排行汇总…");
+        try{
+            RankingSnapshot board=RankingSnapshot.read(connection.getPath(RankingSnapshot.path(revision,cid),RankingSnapshot.MAX_BYTES),engine.server,revision,cid);
+            // Old snapshots may outlive a stopped worker. Fall back to live legacy indices.
+            if(System.currentTimeMillis()-board.updated>120000)throw new IOException("服务器汇总尚未更新");
+            Snapshot fast=new Snapshot();fast.cid=cid;fast.updated=board.updated;fast.failed=board.failed;fast.folders=board.folders;fast.players.addAll(board.players);save(target,fast);return fast;
+        }catch(Exception unavailable){progress.update("汇总暂不可用，读取兼容排行…");}
+        RankingIndex.Remote source=new OpenListRankingRemote(connection);List<String> ids=source.directories(RankingIndex.board(revision,cid));Snapshot result=new Snapshot();result.cid=cid;result.folders=ids.size();Map<String,RankingData.Player> fallback=new HashMap<>();if(previous!=null)for(RankingData.Player p:previous.players)fallback.put(p.qq,p);
         long[] downloaded={0};RankingIndex.Remote remote=new RankingIndex.Remote(){
             public List<String> directories(String p)throws Exception{return source.directories(p);}public List<String> files(String p)throws Exception{return source.files(p);}
             public void put(String p,String n,byte[] b)throws Exception{throw new IOException("浏览排行榜不会上传");}public void remove(String p,List<String> n)throws Exception{throw new IOException("浏览排行榜不会清理索引");}

@@ -10,7 +10,18 @@ tools/android-sdk/
 tools/android-libs/
 tools/test-libs/
 .secrets/
+# Deployment credentials and user-provided private archives must stay outside Git.
+credentials/
+*-private/
+*.rar
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+known_hosts*
+ssh_config
 android/assets/catalog.json
+android/assets/chart-keys.json
 android/assets/aliases.json
 android/assets/default-reader.json
 android/assets/default-rank.json

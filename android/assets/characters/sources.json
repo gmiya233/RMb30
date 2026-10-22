@@ -1,0 +1,41 @@
+{
+  "source_pack": "节奏大师人物.zip",
+  "usage": "Unmodified original transparent character cards; native background crops and fades at draw time.",
+  "characters": [
+    {
+      "page": "home",
+      "reference_index": 398,
+      "asset": "home.png",
+      "source": "人物/人物卡片/6871f7e0-9d36-40f8-9b94-0efef0894f3b.png",
+      "sha256": "c2aff8ae64b79084525e2e1f7900952c10f515be35d0dc03ac4310d2f98ecf0a"
+    },
+    {
+      "page": "b30",
+      "reference_index": 458,
+      "asset": "b30.png",
+      "source": "人物/人物卡片/df43b2ae-2aef-4557-a416-6953568fc5cd.png",
+      "sha256": "a7afda7e60e75ab40f4da3ab539e6da99ab38ed2ab45cf8caf2a1be6ff03745d"
+    },
+    {
+      "page": "ranking",
+      "reference_index": 469,
+      "asset": "ranking.png",
+      "source": "人物/人物卡片/f90a469d-9199-489b-8196-6a18a96891aa.png",
+      "sha256": "d7955dcf5ebb967c043e5993fa28c08f7f3ce31ac1fd959f23c0049b59642270"
+    },
+    {
+      "page": "songs",
+      "reference_index": 467,
+      "asset": "songs.png",
+      "source": "人物/人物卡片/f5b6088b-2edd-498e-977f-43f979b33887.png",
+      "sha256": "b892aa1b53b895fd4958ca9ea63eb50d51daad83b41c106c756c83f328b799b9"
+    },
+    {
+      "page": "settings",
+      "reference_index": 360,
+      "asset": "settings.png",
+      "source": "人物/人物卡片/1d519481-73b3-46e4-9cb6-8408030cc086.png",
+      "sha256": "72cf8e87186869e9842b461ca2f3481776704ff6319dfc35fda23cafc17bdef6"
+    }
+  ]
+}

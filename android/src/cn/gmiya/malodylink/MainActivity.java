@@ -22,9 +22,9 @@ import java.util.concurrent.*;
 import rikka.shizuku.Shizuku;
 
 public final class MainActivity extends Activity {
-    private static final int BG=0xff0f172a,CARD=0xff19263b,INK=0xfff1f5f9,MUTED=0xffb1bfd2,GREEN=0xff74e4d6;
+    private static final int BG=AppUi.BG,CARD=AppUi.CARD,INK=AppUi.INK,MUTED=AppUi.MUTED,GREEN=AppUi.ACCENT;
     private int selectedTab;private final int[] scrollPositions=new int[5];private ScrollView currentScroll;private LinearLayout screen;private PosterPanel posterPanel;private Bitmap homeImage;private int renderGeneration;private String lastMessage="";
-    private RankingPanel rankingPanel;private boolean rankSingle;private int rankCid;private String songQuery="",rankQuery="";
+    private RankingHub rankingPanel;private boolean rankSingle;private int rankCid;private String songQuery="",rankQuery="";private int songSearchMode;
     private final ExecutorService previews=Executors.newSingleThreadExecutor();
     private Engine engine;private LinearLayout root;private TextView status;private volatile boolean busy=false;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -45,11 +45,11 @@ public final class MainActivity extends Activity {
         loadedCloud=getSharedPreferences("cloud",0).getLong("last_sync",0);
         IntentFilter updates=new IntentFilter(LocalScoreSync.UPDATED);if(Build.VERSION.SDK_INT>=33)registerReceiver(syncUpdates,updates,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(syncUpdates,updates);syncReceiverRegistered=true;
         Shizuku.addRequestPermissionResultListener(permissionListener);
-        selectedTab=state==null?0:Math.max(0,Math.min(4,state.getInt("tab",0)));if(state!=null){rankSingle=state.getBoolean("rankSingle");rankCid=state.getInt("rankCid");songQuery=state.getString("songQuery","");rankQuery=state.getString("rankQuery","");}render();if(new File(getFilesDir(),"inbox/manifest.json").exists())runTask(()->saveAndCloud(()->"USB 导入完成：新增 "+engine.importUsb()+" 条成绩"));
+        selectedTab=state==null?Math.max(0,Math.min(4,getIntent().getIntExtra("tab",0))):Math.max(0,Math.min(4,state.getInt("tab",0)));if(state!=null){rankSingle=state.getBoolean("rankSingle");rankCid=state.getInt("rankCid");songQuery=state.getString("songQuery","");songSearchMode=state.getInt("songSearchMode",0);rankQuery=state.getString("rankQuery","");}render();if(new File(getFilesDir(),"inbox/manifest.json").exists())runTask(()->saveAndCloud(()->"USB 导入完成：新增 "+engine.importUsb()+" 条成绩"));
     }
     @Override protected void onResume(){super.onResume();reloadSynced();if(engine!=null&&!busy&&new File(getFilesDir(),"inbox/manifest.json").exists())runTask(()->saveAndCloud(()->"USB 导入完成：新增 "+engine.importUsb()+" 条成绩"));}
-    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putInt("tab",selectedTab);state.putBoolean("rankSingle",rankSingle);state.putInt("rankCid",rankCid);state.putString("songQuery",songQuery);state.putString("rankQuery",rankQuery);}
-    @Override public void onBackPressed(){if(selectedTab!=0)selectTab(0);else super.onBackPressed();}
+    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putInt("tab",selectedTab);state.putBoolean("rankSingle",rankSingle);state.putInt("rankCid",rankCid);state.putString("songQuery",songQuery);state.putInt("songSearchMode",songSearchMode);state.putString("rankQuery",rankQuery);}
+    @Override public void onBackPressed(){if(selectedTab==2&&rankingPanel!=null&&rankingPanel.back())return;if(selectedTab!=0)selectTab(0);else super.onBackPressed();}
     @Override public void onRequestPermissionsResult(int req,String[] p,int[] r){super.onRequestPermissionsResult(req,p,r);if(posterPanel!=null)posterPanel.onRequestPermissionsResult(req,p,r);}
     @Override protected void onDestroy(){renderGeneration++;if(posterPanel!=null)posterPanel.close();if(rankingPanel!=null)rankingPanel.close();previews.shutdown();if(syncReceiverRegistered)unregisterReceiver(syncUpdates);Shizuku.removeRequestPermissionResultListener(permissionListener);if(serviceArgs!=null&&Shizuku.pingBinder())try{Shizuku.unbindUserService(serviceArgs,connection,true);}catch(Exception ignored){}worker.shutdown();super.onDestroy();}
     private void reloadSynced(){
@@ -63,7 +63,27 @@ public final class MainActivity extends Activity {
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setLineSpacing(dp(3),1);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
     private void space(LinearLayout l,int h){View v=new View(this);l.addView(v,new LinearLayout.LayoutParams(1,dp(h)));}
     private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(20),dp(18),dp(20),dp(18));l.setBackground(shape(CARD,18));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(14);root.addView(l,p);return l;}
-    private void button(LinearLayout parent,String label,boolean primary,Runnable action){if(label.equals("同步本机成绩")){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);TextView caption=text("同步本机成绩",16,INK,true);row.addView(caption,new LinearLayout.LayoutParams(0,-2,1));ImageButton icon=new ImageButton(this);icon.setImageDrawable(new NavIcon(4,primary?BG:INK));icon.setPadding(dp(14),dp(14),dp(14),dp(14));icon.setScaleType(ImageView.ScaleType.FIT_CENTER);icon.setContentDescription(label);icon.setTooltipText(label);icon.setBackground(new RippleDrawable(ColorStateList.valueOf(0x554a8c97),shape(primary?GREEN:0xff2b3c55,16),shape(Color.WHITE,16)));row.addView(icon,new LinearLayout.LayoutParams(dp(56),dp(56)));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(12);parent.addView(row,rp);icon.setOnClickListener(v->action.run());return;}Button b=new Button(this);b.setAllCaps(false);b.setText(label);b.setTextSize(16);b.setTextColor(primary?BG:INK);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(primary?GREEN:0xff2b3c55));b.setMinHeight(dp(52));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(10);parent.addView(b,p);b.setOnClickListener(v->{if((busy||LocalScoreSync.isBusy()||LocalSyncService.active||CloudSyncService.active)&&!label.equals("连接设置 / 首次配对")&&!label.equals("同步本机成绩")&&!label.equals("O20 + N10 成绩图")){message("正在同步，请稍候；可在同步页面或通知中查看进度。");return;}action.run();});}
+    private void button(LinearLayout parent,String label,boolean primary,Runnable action){
+        boolean compact=selectedTab==4;
+        if(label.equals("同步本机成绩")){
+            LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);TextView caption=text(label,compact?14:16,INK,true);row.addView(caption,new LinearLayout.LayoutParams(0,-2,1));
+            ImageButton icon=new ImageButton(this);icon.setImageDrawable(new NavIcon(4,primary?AppUi.ON_SUCCESS:INK));int padding=dp(compact?12:14);icon.setPadding(padding,padding,padding,padding);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);icon.setContentDescription(label);icon.setTooltipText(label);icon.setBackground(new RippleDrawable(ColorStateList.valueOf(0x554a8c97),shape(primary?GREEN:AppUi.SOFT,16),shape(Color.WHITE,16)));
+            row.addView(icon,new LinearLayout.LayoutParams(dp(compact?48:56),dp(compact?48:56)));LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.topMargin=dp(compact?6:12);parent.addView(row,rp);icon.setOnClickListener(v->action.run());return;
+        }
+        Button b=new Button(this);b.setAllCaps(false);b.setText(label);b.setTextSize(compact?14:16);b.setTextColor(primary?AppUi.ON_SUCCESS:INK);b.setBackgroundTintList(ColorStateList.valueOf(primary?GREEN:AppUi.SOFT));b.setMinHeight(dp(compact?48:52));
+        if(compact){b.setMinimumHeight(dp(48));b.setPadding(dp(10),dp(6),dp(10),dp(6));}
+        LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.topMargin=dp(compact?4:10);parent.addView(b,size);
+        b.setOnClickListener(v->{if((busy||LocalScoreSync.isBusy()||LocalSyncService.active||CloudSyncService.active)&&!label.equals("连接设置 / 首次配对")&&!label.equals("同步本机成绩")&&!label.equals("O20 + N10 成绩图")){message("正在同步，请稍候；可在同步页面或通知中查看进度。");return;}action.run();});
+    }
+    private LinearLayout settingsCard(LinearLayout parent){
+        LinearLayout card=AppUi.column(this,14);card.setBackground(shape(CARD,18));LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.bottomMargin=dp(12);parent.addView(card,size);return card;
+    }
+    private void pairingEntry(){
+        LinearLayout card=AppUi.column(this,16);GradientDrawable background=shape(AppUi.SELECTED,18);background.setStroke(dp(1),GREEN);card.setBackground(background);
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);LinearLayout copy=AppUi.column(this,0);copy.addView(text("首次使用，先完成配对",18,GREEN,true));copy.addView(text("只需首次连接时设置，之后一键同步成绩。",13,MUTED,false));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+        Button pair=AppUi.button(this,"首次配对 →",()->startActivityForResult(new Intent(this,InternalReaderActivity.class),12));pair.setTextColor(AppUi.ON_SUCCESS);pair.setBackgroundTintList(ColorStateList.valueOf(GREEN));pair.setPadding(dp(14),dp(6),dp(14),dp(6));LinearLayout.LayoutParams action=new LinearLayout.LayoutParams(-2,-2);action.leftMargin=dp(12);row.addView(pair,action);card.addView(row);
+        LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.bottomMargin=dp(12);root.addView(card,size);
+    }
     private void rememberScroll(){if(currentScroll!=null)scrollPositions[selectedTab]=currentScroll.getScrollY();}
     private void selectTab(int tab){if(tab==selectedTab)return;rememberScroll();currentScroll=null;selectedTab=tab;render();}
     private void render(){
@@ -74,10 +94,10 @@ public final class MainActivity extends Activity {
         homeImage=null;
         screen=new LinearLayout(this);screen.setOrientation(1);screen.setBackgroundColor(BG);setContentView(screen);
         screen.setOnApplyWindowInsetsListener((v,in)->{screen.setPadding(in.getSystemWindowInsetLeft(),in.getSystemWindowInsetTop(),in.getSystemWindowInsetRight(),in.getSystemWindowInsetBottom());return in;});
-        FrameLayout content=new FrameLayout(this);screen.addView(content,new LinearLayout.LayoutParams(-1,0,1));currentScroll=null;
+        FrameLayout content=new FrameLayout(this);content.setBackground(new CharacterBackdrop(this,selectedTab));screen.addView(content,new LinearLayout.LayoutParams(-1,0,1));currentScroll=null;
         if(selectedTab==1){posterPanel=new PosterPanel(this,false);content.addView(posterPanel.view(),new FrameLayout.LayoutParams(-1,-1));}
-        else if(selectedTab==2){rankingPanel=new RankingPanel(this,engine,rankSingle,rankCid,rankQuery,(single,cid)->{rankSingle=single;rankCid=cid;},q->rankQuery=q);content.addView(rankingPanel,new FrameLayout.LayoutParams(-1,-1));}
-        else if(selectedTab==3){content.addView(new SongPanel(this,engine,songQuery,q->songQuery=q,(song,cid)->{rankSingle=true;rankCid=cid;selectTab(2);},false),new FrameLayout.LayoutParams(-1,-1));}
+        else if(selectedTab==2){rankingPanel=new RankingHub(this,engine,rankSingle,rankCid,rankQuery,(single,cid)->{rankSingle=single;rankCid=cid;},q->rankQuery=q);content.addView(rankingPanel,new FrameLayout.LayoutParams(-1,-1));}
+        else if(selectedTab==3){content.addView(new SongPanel(this,engine,songQuery,songSearchMode,(mode,q)->{songSearchMode=mode;songQuery=q;},(song,cid)->{rankSingle=true;rankCid=cid;selectTab(2);},false),new FrameLayout.LayoutParams(-1,-1));}
         else{
             currentScroll=new ScrollView(this);currentScroll.setFillViewport(true);currentScroll.setClipToPadding(false);
             root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(20),dp(24),dp(20),dp(24));
@@ -85,24 +105,24 @@ public final class MainActivity extends Activity {
             if(selectedTab==0)renderHome();else renderSettings();
             final ScrollView scroll=currentScroll;final int position=scrollPositions[selectedTab];scroll.post(()->scroll.scrollTo(0,position));
         }
-        View line=new View(this);line.setBackgroundColor(0xff2a374e);screen.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
-        LinearLayout nav=new LinearLayout(this);nav.setId(0x1020100);nav.setPadding(dp(8),dp(6),dp(8),dp(6));nav.setBackgroundColor(0xff131e31);nav.setGravity(Gravity.CENTER);
+        View line=new View(this);line.setBackgroundColor(AppUi.BORDER);screen.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
+        LinearLayout nav=new LinearLayout(this);nav.setId(0x1020100);nav.setPadding(dp(8),dp(6),dp(8),dp(6));nav.setBackgroundColor(AppUi.CARD);nav.setGravity(Gravity.CENTER);
         String[] labels={"首页","B30","排行榜","歌曲","设置"};int[] icons={0,1,9,10,2};for(int i=0;i<labels.length;i++){final int tab=i;boolean active=i==selectedTab;Button item=new Button(this);item.setId(0x1020101+i);item.setText(labels[i]);item.setTextSize(12);item.setAllCaps(false);item.setTextColor(active?GREEN:MUTED);item.setTypeface(Typeface.DEFAULT,active?Typeface.BOLD:Typeface.NORMAL);item.setSelected(active);item.setMinWidth(0);item.setMinimumWidth(0);item.setMinHeight(dp(64));item.setPadding(dp(2),dp(8),dp(2),dp(8));item.setMaxLines(1);item.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);
-            NavIcon icon=new NavIcon(icons[i],active?GREEN:MUTED);icon.setBounds(0,0,dp(23),dp(23));item.setCompoundDrawables(null,icon,null,null);item.setCompoundDrawablePadding(dp(4));item.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3374e4d6),shape(active?0xff203c4b:0x00131e31,16),shape(Color.WHITE,16)));item.setContentDescription(labels[i]+(active?"，当前页面":""));LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,-2,1);np.setMargins(dp(2),0,dp(2),0);nav.addView(item,np);item.setOnClickListener(v->selectTab(tab));}
+            NavIcon icon=new NavIcon(icons[i],active?GREEN:MUTED);icon.setBounds(0,0,dp(23),dp(23));item.setCompoundDrawables(null,icon,null,null);item.setCompoundDrawablePadding(dp(4));item.setBackground(new RippleDrawable(ColorStateList.valueOf(0x24087f8c),shape(active?AppUi.SELECTED:0x00000000,16),shape(Color.WHITE,16)));item.setContentDescription(labels[i]+(active?"，当前页面":""));LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,-2,1);np.setMargins(dp(2),0,dp(2),0);nav.addView(item,np);item.setOnClickListener(v->selectTab(tab));}
         screen.addView(nav,new LinearLayout.LayoutParams(-1,-2));screen.requestApplyInsets();
     }
     private void heading(String title,String subtitle){root.addView(text("MALODY LINK",12,GREEN,true));space(root,8);root.addView(text(title,28,INK,true));space(root,4);root.addView(text(subtitle,14,MUTED,false));space(root,24);}
     private void renderHome(){
         String qq=ScoreStore.profile(this);heading("我的成绩",qq.isEmpty()?"记录每一次进步":"QQ "+qq+" · 我的谱库记录");
-        LinearLayout overview=card();GradientDrawable hero=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xff203b50,0xff1b2b43});hero.setCornerRadius(dp(20));overview.setBackground(hero);
-        overview.addView(text("rating · 试算",14,0xffb8d6df,false));TextView rating=text("—",42,INK,true);overview.addView(rating);TextView breakdown=text("O20 + N10  /  缺位按 0 计",13,MUTED,false);overview.addView(breakdown);space(overview,20);
+        LinearLayout overview=card();GradientDrawable hero=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xffe0f3f0,0xffeef6fb});hero.setCornerRadius(dp(20));overview.setBackground(hero);
+        overview.addView(text("rating · 试算",14,AppUi.MUTED,false));TextView rating=text("—",42,INK,true);overview.addView(rating);TextView breakdown=text("O20 + N10  /  缺位按 0 计",13,MUTED,false);overview.addView(breakdown);space(overview,20);
         LinearLayout metrics=new LinearLayout(this);metric(metrics,Integer.toString(engine.scores.length()),"成绩记录");TextView old=metric(metrics,"— / 20","日常歌曲");TextView fresh=metric(metrics,"— / 10","新歌");overview.addView(metrics);space(overview,8);
         button(overview,"同步本机成绩",true,()->startActivityForResult(new Intent(this,InternalReaderActivity.class).putExtra("sync_now",true),12));
         status=text(lastMessage.isEmpty()?(qq.isEmpty()?"云存档尚未设置 · 可在「设置」中填写 QQ":getSharedPreferences("cloud",0).getString("last_result","云存档已选择，等待同步")):lastMessage,12,MUTED,false);space(overview,8);overview.addView(status);
-        LinearLayout label=new LinearLayout(this);label.setGravity(Gravity.CENTER_VERTICAL);label.addView(text("我的 B30",21,INK,true),new LinearLayout.LayoutParams(0,-2,1));Button open=new Button(this);open.setText("查看完整图");open.setAllCaps(false);open.setTextSize(13);open.setTextColor(GREEN);open.setMinHeight(dp(48));open.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3374e4d6),null,shape(Color.WHITE,12)));open.setOnClickListener(v->selectTab(1));label.addView(open);root.addView(label);space(root,8);
+        LinearLayout label=new LinearLayout(this);label.setGravity(Gravity.CENTER_VERTICAL);label.addView(text("我的 B30",21,INK,true),new LinearLayout.LayoutParams(0,-2,1));Button open=new Button(this);open.setText("查看完整图");open.setAllCaps(false);open.setTextSize(13);open.setTextColor(GREEN);open.setMinHeight(dp(48));open.setBackground(new RippleDrawable(ColorStateList.valueOf(0x24087f8c),null,shape(Color.WHITE,12)));open.setOnClickListener(v->selectTab(1));label.addView(open);root.addView(label);space(root,8);
         LinearLayout poster=card();poster.setPadding(dp(8),dp(8),dp(8),dp(12));
-        ImageView thumbnail=new ImageView(this){@Override protected void onMeasure(int w,int h){int width=View.MeasureSpec.getSize(w);super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(Math.min((int)(width*1664f/1500),dp(440)),View.MeasureSpec.EXACTLY));}};thumbnail.setScaleType(ImageView.ScaleType.FIT_CENTER);thumbnail.setBackground(shape(0xff142337,12));thumbnail.setContentDescription("实际成绩 B30 缩略图，点击进入B30页面");thumbnail.setFocusable(true);thumbnail.setClickable(true);thumbnail.setOnClickListener(v->selectTab(1));poster.addView(thumbnail,new LinearLayout.LayoutParams(-1,-2));TextView caption=text("正在生成 O20 + N10 成绩图…",12,MUTED,false);caption.setPadding(dp(8),dp(8),dp(8),0);poster.addView(caption);
-        space(root,8);root.addView(text("最近成绩",21,INK,true));space(root,12);renderRecent();
+        ImageView thumbnail=new ImageView(this){@Override protected void onMeasure(int w,int h){int width=View.MeasureSpec.getSize(w);super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(Math.min((int)(width*1664f/1500),dp(440)),View.MeasureSpec.EXACTLY));}};thumbnail.setScaleType(ImageView.ScaleType.FIT_CENTER);thumbnail.setBackground(shape(AppUi.SOFT,12));thumbnail.setContentDescription("实际成绩 B30 缩略图，点击进入B30页面");thumbnail.setFocusable(true);thumbnail.setClickable(true);thumbnail.setOnClickListener(v->selectTab(1));poster.addView(thumbnail,new LinearLayout.LayoutParams(-1,-2));TextView caption=text("正在生成 O20 + N10 成绩图…",12,MUTED,false);caption.setPadding(dp(8),dp(8),dp(8),0);poster.addView(caption);
+        space(root,8);root.addView(text("最近游玩 · 50条",21,INK,true));space(root,12);renderRecent();
         final int generation=renderGeneration;final Engine snapshot=engine;
         previews.execute(()->{try{PosterData.Board board=PosterData.load(this,snapshot,false,PosterPanel.rules(this),0);Bitmap full=new ScorePoster(this).render(board);Bitmap small=Bitmap.createScaledBitmap(full,750,832,true);full.recycle();final double total=board.rating();
             runOnUiThread(()->{if(generation!=renderGeneration||isDestroyed()){small.recycle();return;}homeImage=small;thumbnail.setImageBitmap(small);rating.setText(String.format(Locale.ROOT,"%.4f",total));old.setText(board.old.size()+" / 20");fresh.setText(board.fresh.size()+" / 10");caption.setText("");caption.setVisibility(View.GONE);});
@@ -110,41 +130,53 @@ public final class MainActivity extends Activity {
     }
     private TextView metric(LinearLayout row,String value,String label){LinearLayout cell=new LinearLayout(this);cell.setOrientation(1);TextView number=text(value,20,INK,true);number.setMaxLines(1);if(Build.VERSION.SDK_INT>=26)number.setAutoSizeTextTypeUniformWithConfiguration(12,20,1,android.util.TypedValue.COMPLEX_UNIT_SP);cell.addView(number);cell.addView(text(label,12,MUTED,false));row.addView(cell,new LinearLayout.LayoutParams(0,-2,1));return number;}
     private void renderRecent(){
-        Set<String> active=new HashSet<>();for(int i=0;i<engine.charts().length();i++){JSONObject chart=engine.charts().optJSONObject(i);active.add(chart.optInt("cid")+":"+chart.optString("server_hash"));}List<JSONObject> recent=new ArrayList<>();for(int i=0;i<engine.scores.length();i++){JSONObject s=engine.scores.optJSONObject(i);if(s!=null&&active.contains(s.optInt("cid")+":"+s.optString("server_hash")))recent.add(s);}recent.sort((a,b)->Long.compare(b.optLong("played_at"),a.optLong("played_at")));
+        List<RecentPlays.Play> recent=RecentPlays.load(engine.scores,engine.charts());
         if(recent.isEmpty()){LinearLayout empty=card();empty.addView(text("还没有收录成绩",18,INK,true));space(empty,8);empty.addView(text("完成游玩后同步本机成绩，或在设置中恢复 QQ 云存档。",14,MUTED,false));return;}
-        for(int i=0;i<Math.min(10,recent.size());i++){JSONObject s=recent.get(i);LinearLayout row=card();TextView title=text(s.optString("title"),17,INK,true);title.setMaxLines(2);row.addView(title);space(row,4);row.addView(text(s.optString("version")+" · "+date(s.optLong("played_at")),12,MUTED,false));space(row,12);
-            LinearLayout values=new LinearLayout(this);values.setGravity(Gravity.CENTER_VERTICAL);values.addView(text(String.format(Locale.ROOT,"%,d",s.optLong("score_candidate")),26,INK,true),new LinearLayout.LayoutParams(0,-2,1));TextView accuracy=text(String.format(Locale.ROOT,"%.3f%%",s.optDouble("accuracy_candidate")),16,GREEN,true);values.addView(accuracy);row.addView(values);JSONObject raw=s.optJSONObject("raw_score_fields");int judge=raw==null?0:raw.optInt("4");row.addView(text(RatingRules.judgeName(judge)+" · 数值字段待核对",12,MUTED,false));}
+        root.addView(text("最近 "+recent.size()+" 次游玩 · 按时间倒序 · 保留同曲多次记录",13,MUTED,false));space(root,12);
+        SongCatalogue catalogue=new SongCatalogue(engine.charts());
+        LinearLayout cards=new LinearLayout(this);cards.setOrientation(LinearLayout.VERTICAL);root.addView(cards);
+        final int[] columns={0};
+        cards.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
+            int count=r-l>=dp(560)?2:1;if(columns[0]==count)return;columns[0]=count;cards.removeAllViews();
+            for(int i=0;i<recent.size();i+=count){LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.TOP);LinearLayout.LayoutParams rp=new LinearLayout.LayoutParams(-1,-2);rp.bottomMargin=dp(12);cards.addView(row,rp);
+                for(int j=0;j<count;j++){LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,1);if(j>0)cp.leftMargin=dp(12);
+                    if(i+j<recent.size()){RecentPlays.Play play=recent.get(i+j);row.addView(new RecentPlayCard(this,play,i+j+1,catalogue.forChart(play.chart.optInt("cid"))),cp);}else row.addView(new View(this),cp);
+                }
+            }
+        });
     }
     private void renderSettings(){
         heading("设置","读取、云存档与谱库管理");
-        status=text(lastMessage.isEmpty()?"成绩保存在本机，可随时同步云存档。":lastMessage,13,GREEN,false);root.addView(status);space(root,16);
-        LinearLayout appearance=card();appearance.addView(text("玩家名片",20,INK,true));appearance.addView(text("本地头像与昵称；歌名称号在 B30 页选择",14,MUTED,false));button(appearance,"设置头像与昵称",false,()->startActivityForResult(new Intent(this,PlayerProfileActivity.class),20));
-        LinearLayout cloud=card();cloud.addView(text("QQ 云存档",20,INK,true));String qq=ScoreStore.profile(this);
+        pairingEntry();
+        status=text(lastMessage.isEmpty()?"成绩保存在本机，可随时同步云存档。":lastMessage,13,GREEN,false);root.addView(status);space(root,12);
+        LinearLayout grid=new LinearLayout(this);grid.setGravity(Gravity.TOP);root.addView(grid,new LinearLayout.LayoutParams(-1,-2));LinearLayout[] columns={AppUi.column(this,0),AppUi.column(this,0)};
+        for(int i=0;i<2;i++){LinearLayout.LayoutParams column=new LinearLayout.LayoutParams(0,-2,1);if(i==1)column.leftMargin=dp(12);grid.addView(columns[i],column);}
+        LinearLayout appearance=settingsCard(columns[0]);appearance.addView(text("玩家名片",18,INK,true));appearance.addView(text("本地头像与昵称；歌名称号在 B30 页选择",14,MUTED,false));button(appearance,"设置头像与昵称",false,()->startActivityForResult(new Intent(this,PlayerProfileActivity.class),20));
+        LinearLayout cloud=settingsCard(columns[1]);cloud.addView(text("QQ 云存档",18,INK,true));String qq=ScoreStore.profile(this);
         cloud.addView(text(qq.isEmpty()?"先设置QQ号，保存和恢复你的成绩。":"当前存档 · QQ "+qq,15,MUTED,false));
-        cloudStatus=text(getSharedPreferences("cloud",0).getString("last_result","尚未同步云端，本机成绩保留。"),13,0xff80e6ed,false);space(cloud,8);cloud.addView(cloudStatus);
+        cloudStatus=text(getSharedPreferences("cloud",0).getString("last_result","尚未同步云端，本机成绩保留。"),13,AppUi.ACCENT,false);space(cloud,8);cloud.addView(cloudStatus);
         button(cloud,qq.isEmpty()?"设置 QQ 并同步":"切换 QQ 存档",false,this::bindQq);
         if(!qq.isEmpty()){
             Switch automatic=new Switch(this);automatic.setText("本机读取后自动合并到云端");automatic.setTextSize(14);automatic.setTextColor(INK);automatic.setMinHeight(dp(48));automatic.setChecked(getSharedPreferences("cloud",0).getBoolean("auto",true));automatic.setOnCheckedChangeListener((v,checked)->getSharedPreferences("cloud",0).edit().putBoolean("auto",checked).apply());cloud.addView(automatic);
             button(cloud,"合并同步云端（上传＋拉取）",true,()->startCloud(true));button(cloud,"只从云端拉取",false,()->startCloud(false));
         }
         cloud.addView(text("QQ号仅作存档编号，暂不验证归属。不同QQ的本地存档分别保存。",12,MUTED,false));
-        LinearLayout reader=card();reader.addView(text("读取与筛选",20,INK,true));space(reader,4);reader.addView(text("首次按引导配对；之后点一次同步即可。默认账号自动更新谱库，无需手填账号。",14,MUTED,false));
+        LinearLayout reader=settingsCard(columns[0]);reader.addView(text("读取与筛选",18,INK,true));space(reader,4);reader.addView(text("首次按引导配对；之后点一次同步即可。默认账号自动更新谱库，无需手填账号。",14,MUTED,false));
         button(reader,"同步本机成绩",true,()->startActivityForResult(new Intent(this,InternalReaderActivity.class).putExtra("sync_now",true),12));
-        button(reader,"连接设置 / 首次配对",false,()->startActivityForResult(new Intent(this,InternalReaderActivity.class),12));
-        button(reader,"Shizuku 兼容读取（可选）",false,()->{if(readerBinder==null)authorize();else scan();});
-        if((getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0)button(reader,"导入 USB 同步数据",false,()->runTask(()->saveAndCloud(()->"USB 导入完成：新增 "+engine.importUsb()+" 条成绩")));
-        button(reader,"选择回放文件",false,()->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,10);});
-        LinearLayout server=card();server.addView(text("我的谱面服务器",18,INK,true));server.addView(text(engine.server,13,MUTED,false));
+
+        LinearLayout server=settingsCard(columns[1]);server.addView(text("我的谱面服务器",18,INK,true));server.addView(text(engine.server,13,MUTED,false));
         long updated=engine.catalog.optLong("updated_at");server.addView(text("清单更新："+date(updated),12,MUTED,false));
         button(server,"更新谱库（默认账号）",false,()->runTask(()->DefaultCatalog.refresh(this,engine,true,this::message)));button(server,"其他服务器 / 账号",false,this::login);button(server,"导出匹配成绩 JSON",false,()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"malody-link-scores.json");startActivityForResult(i,11);});
 
-        LinearLayout about=card();about.addView(text("关于 Malody Link",18,INK,true));space(about,8);about.addView(text("1.5.1 · O20 + N10\n仅收录当前服务器谱库成绩；预览参数不改写原始记录。",13,MUTED,false));
+        LinearLayout about=settingsCard(columns[0]);about.addView(text("关于 Malody Link",18,INK,true));space(about,8);about.addView(text(appVersion()+" · O20 + N10\n仅收录当前服务器谱库成绩；预览参数不改写原始记录。",13,MUTED,false));button(about,"获取更新",false,()->startActivity(new Intent(this,UpdateActivity.class)));
         space(root,8);root.addView(text("QQ机器人尚未接入；成绩数值字段仍待核对。",12,MUTED,false));
     }
+    private String appVersion(){try{return getPackageManager().getPackageInfo(getPackageName(),0).versionName;}catch(Exception unavailable){return "未知版本";}}
     private int validAliases(){int count=0;Iterator<String> it=engine.aliases.keys();while(it.hasNext()){JSONObject a=engine.aliases.optJSONObject(it.next());if(a!=null&&engine.active(a.optInt("cid"),a.optString("server_hash")))count++;}return count;}
     private String date(long seconds){if(seconds<=0)return "未知";SimpleDateFormat f=new SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.CHINA);f.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));return f.format(new Date(seconds*1000));}
     private void message(String s){runOnUiThread(()->{lastMessage=s;if(status!=null)status.setText(s);});}
     private interface Task {String run()throws Exception;}
+    public void uploadScoresFromB30(){if(ScoreStore.profile(this).isEmpty())bindQq();else startCloud(true);}
     private void startCloud(boolean upload){try{CloudSyncService.request(this,upload);message(upload?"正在合并云端成绩…":"正在从云端恢复成绩…");}catch(Exception e){message(e.getMessage());}}
     private void bindQq(){
         LinearLayout form=new LinearLayout(this);form.setOrientation(1);form.setPadding(dp(24),dp(8),dp(24),0);

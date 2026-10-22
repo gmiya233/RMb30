@@ -1,0 +1,32 @@
+{
+  "source_archive": "ui界面.zip",
+  "source_sprite": "ui-068.png",
+  "source_original": "ui界面/c5dfb941-9f91-40be-a269-9d58cdfc0c97.png",
+  "regions": {
+    "keys_4.png": {
+      "box": [
+        0,
+        928,
+        129,
+        1183
+      ],
+      "rotate_ccw": 90
+    },
+    "keys_5.png": {
+      "box": [
+        872,
+        0,
+        1121,
+        130
+      ]
+    },
+    "keys_6.png": {
+      "box": [
+        219,
+        293,
+        471,
+        423
+      ]
+    }
+  }
+}

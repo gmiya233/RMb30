@@ -29,7 +29,7 @@ public final class Engine {
         // Older local catalogues lack descriptive fields. Enrich only matching revisions,
         // without restoring removed charts or changing score identities.
         if(server.equals(bundled.optString("server"))){Map<Integer,JSONObject> descriptions=new HashMap<>();JSONArray source=bundled.getJSONArray("charts");for(int i=0;i<source.length();i++){JSONObject row=source.getJSONObject(i);descriptions.put(row.optInt("cid"),row);}JSONArray current=catalog.getJSONArray("charts");for(int i=0;i<current.length();i++){JSONObject row=current.getJSONObject(i),base=descriptions.get(row.optInt("cid"));if(base!=null&&row.optString("server_hash").equals(base.optString("server_hash")))for(String key:new String[]{"bpm","creator","artist","cover","background"})if((!row.has(key)||row.isNull(key)||row.optString(key).isEmpty())&&base.has(key))row.put(key,base.get(key));}}
-        aliases=load("aliases.json",new JSONObject());scores=loadArray("scores.json");
+        enrichChartKeys();aliases=load("aliases.json",new JSONObject());scores=loadArray("scores.json");
         // Keep only results still present in this exact catalogue revision.
         JSONArray filtered=new JSONArray();for(int i=0;i<scores.length();i++){JSONObject s=scores.getJSONObject(i);if(active(s.optInt("cid"),s.optString("server_hash")))filtered.put(s);}scores=filtered;
     }
@@ -41,6 +41,14 @@ public final class Engine {
     private JSONArray loadArray(String name)throws Exception {File f=ScoreStore.file(context,profile,name);return ScoreStore.exists(f)?new JSONArray(new String(ScoreStore.read(f),StandardCharsets.UTF_8)):new JSONArray();}
     private void save(String name,Object value)throws Exception {ScoreStore.write(ScoreStore.file(context,profile,name),value);}
     public JSONArray charts(){return catalog.optJSONArray("charts");}
+    private void enrichChartKeys(){
+        try{ChartKeys.enrich(charts(),new JSONObject(new String(read(context.getAssets().open("chart-keys.json"),16000000),StandardCharsets.UTF_8)),server);}catch(Exception unavailable){}
+        try{ChartKeys.enrich(charts(),load("chart-keys.json",new JSONObject()),server);}catch(Exception unavailable){}
+    }
+    public void installChartKeys(JSONObject metadata)throws Exception {
+        if(metadata.optInt("schema")!=1||!server.equals(metadata.optString("server")))return;
+        ChartKeys.enrich(charts(),metadata,server);save("chart-keys.json",metadata);save("catalog.json",catalog);
+    }
     public boolean active(int cid,String hash){JSONArray a=charts();for(int i=0;i<a.length();i++){JSONObject c=a.optJSONObject(i);if(c.optInt("cid")==cid&&c.optString("server_hash").equals(hash))return true;}return false;}
     private JSONObject request(String path,JSONObject data)throws Exception {return new JSONObject(new String(http(server+path,"POST",data.toString().getBytes(StandardCharsets.UTF_8),true,8000000),StandardCharsets.UTF_8));}
     private byte[] http(String address,String method,byte[] body,boolean auth,int limit)throws Exception {
@@ -78,7 +86,7 @@ public final class Engine {
             if(rows.length()==0)throw new IOException("服务器当前没有有效谱面，未替换清单");
             server=address;JSONObject next=new JSONObject().put("server",server).put("updated_at",System.currentTimeMillis()/1000).put("charts",rows);
             if(!oldServer.equals(server)){aliases=new JSONObject();scores=new JSONArray();save("aliases.json",aliases);save("scores.json",scores);}
-            catalog=next;save("catalog.json",catalog);context.getSharedPreferences("settings",0).edit().putString("server",server).apply();
+            catalog=next;enrichChartKeys();save("catalog.json",catalog);context.getSharedPreferences("settings",0).edit().putString("server",server).apply();
             JSONArray valid=new JSONArray();for(int i=0;i<scores.length();i++){JSONObject s=scores.getJSONObject(i);if(active(s.optInt("cid"),s.optString("server_hash")))valid.put(s);}scores=valid;save("scores.json",scores);
         }finally{if(temp.exists())temp.delete();}
     }

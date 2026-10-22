@@ -26,6 +26,9 @@ public final class DefaultCatalog {
             byte[] bytes=Engine.read(connection.getInputStream(),16000000);engine.installDefaultCatalogue(bytes,config.getString("server"));
             settings.edit().putLong("default_catalog_updated",System.currentTimeMillis()).apply();
         }finally{connection.disconnect();}
+        try{if(engine.server.equals(RankConnection.config(context).getString("server"))){
+            JSONObject keys=new JSONObject(new String(RankConnection.open(context).getPath("/_catalog/keys-v1.json",16000000),StandardCharsets.UTF_8));engine.installChartKeys(keys);
+        }}catch(Exception optionalMetadataUnavailable){}
         return "谱库已更新："+engine.charts().length()+" 张有效谱面。";
     }
 }

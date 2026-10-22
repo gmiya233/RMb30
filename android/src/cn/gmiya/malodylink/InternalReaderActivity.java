@@ -18,11 +18,11 @@ public final class InternalReaderActivity extends Activity {
     private boolean busy,retryOnResume;private long openedAt;private boolean receiverRegistered;
     private AlertDialog developerReturnDialog;
     private static final int GUIDE_NOTICE=31;
-    private final int BG=0xff0f172a,INK=0xfff1f5f9,MUTED=0xffbacada;
+    private final int BG=AppUi.BG,INK=AppUi.INK,MUTED=AppUi.MUTED;
     private final BroadcastReceiver updates=new BroadcastReceiver(){public void onReceive(Context c,Intent i){refresh();}};
     private int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
     private TextView label(String s,int size,int color){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);t.setPadding(0,dp(10),0,dp(10));return t;}
-    private Button button(LinearLayout root,String text,Runnable action){Button b=new Button(this);b.setText(text);b.setTextSize(16);b.setTextColor(INK);b.setAllCaps(false);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff25465c));b.setMinHeight(dp(52));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(8);root.addView(b,p);b.setOnClickListener(v->action.run());return b;}
+    private Button button(LinearLayout root,String text,Runnable action){Button b=new Button(this);b.setText(text);b.setTextSize(16);b.setTextColor(INK);b.setAllCaps(false);b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(AppUi.SOFT));b.setMinHeight(dp(52));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(8);root.addView(b,p);b.setOnClickListener(v->action.run());return b;}
     @Override public void onCreate(Bundle b){super.onCreate(b);openedAt=System.currentTimeMillis();getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
         ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(BG);scroll.setFillViewport(true);
         LinearLayout shell=new LinearLayout(this);shell.setGravity(android.view.Gravity.TOP|android.view.Gravity.CENTER_HORIZONTAL);scroll.addView(shell);
@@ -55,8 +55,8 @@ public final class InternalReaderActivity extends Activity {
         readyStep=section(root);
         readyStep.addView(label("已完成首次授权",20,INK));
         readyStep.addView(label("点一次即可同步。只检查新增或变化的回放；短暂断线会自动重试。",16,MUTED));
-        syncButton=button(readyStep,"同步成绩",()->connectAndRead(0));syncButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff22c55e));syncButton.setTextColor(BG);
-        status=label("",16,0xff80e6ed);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);root.addView(status);
+        syncButton=button(readyStep,"同步成绩",()->connectAndRead(0));syncButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(AppUi.SUCCESS));syncButton.setTextColor(AppUi.ON_SUCCESS);
+        status=label("",16,AppUi.ACCENT);status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);root.addView(status);
         recover=button(root,"重试同步",()->connectAndRead(0));recover.setVisibility(View.GONE);
         button(root,"查看 O20 + N10 成绩图",()->startActivity(new Intent(this,PosterActivity.class)));
         button(root,"遇到问题 / 连接选项",()->{advanced.setVisibility(advanced.getVisibility()==View.GONE?View.VISIBLE:View.GONE);});
@@ -76,7 +76,7 @@ public final class InternalReaderActivity extends Activity {
     }
     private LinearLayout section(LinearLayout root){
         LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(16),dp(12),dp(16),dp(16));
-        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(0xff19263b);bg.setCornerRadius(dp(16));box.setBackground(bg);
+        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();bg.setColor(AppUi.CARD);bg.setCornerRadius(dp(16));box.setBackground(bg);
         LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.topMargin=dp(16);root.addView(box,params);return box;
     }
     private boolean wirelessEnabled(){return Settings.Global.getInt(getContentResolver(),"adb_wifi_enabled",0)==1||wirelessConfirmed;}

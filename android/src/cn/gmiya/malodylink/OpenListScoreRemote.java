@@ -42,9 +42,23 @@ public final class OpenListScoreRemote implements CloudArchive.Remote {
     public byte[] songArt(String hash)throws Exception {if(!hash.matches("[a-f0-9]{64}"))throw new IOException("无效曲绘编号");return getPath("/_song_art/"+hash+".jpg",1024*1024);}
     public List<String> players()throws Exception {List<String> ids=new ArrayList<>();for(int page=1;page<=100;page++){JSONObject r=api("/api/fs/list",new JSONObject().put("path","/").put("page",page).put("per_page",100).put("refresh",true));ok(r);JSONObject data=r.getJSONObject("data");JSONArray rows=data.optJSONArray("content");if(rows==null)return ids;for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);String name=row.optString("name");if(row.optBoolean("is_dir")&&name.matches("[1-9][0-9]{4,11}"))ids.add(name);}if(ids.size()>1000)throw new IOException("玩家数超过本机读取上限，请使用服务端排行汇总");if(rows.length()<100||page*100>=data.optInt("total",Integer.MAX_VALUE)){Collections.sort(ids);return ids;}}throw new IOException("云目录页数超过上限");}
     byte[] getPath(String path,int limit)throws Exception {
-        JSONObject r=api("/api/fs/get",new JSONObject().put("path",path).put("password",""));ok(r);URL url=new URL(r.getJSONObject("data").getString("raw_url")),origin=new URL(base);
-        if((!url.getProtocol().equals("http")&&!url.getProtocol().equals("https"))||url.getUserInfo()!=null)throw new IOException("云端文件地址无效");
+        URL url=rawUrl(path),origin=new URL(base);
         boolean same=origin.getProtocol().equals(url.getProtocol())&&origin.getHost().equals(url.getHost())&&origin.getPort()==url.getPort();return http(url.toString(),"GET",null,null,same,limit);
+    }
+    private URL rawUrl(String path)throws Exception {
+        JSONObject r=api("/api/fs/get",new JSONObject().put("path",path).put("password",""));ok(r);URL url=new URL(r.getJSONObject("data").getString("raw_url"));
+        if((!url.getProtocol().equals("http")&&!url.getProtocol().equals("https"))||url.getUserInfo()!=null)throw new IOException("云端文件地址无效");return url;
+    }
+    void downloadUpdate(UpdateData release,File target,java.util.function.IntConsumer progress)throws Exception {
+        URL url=rawUrl(release.path()),origin=new URL(base);HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(12000);connection.setReadTimeout(20000);
+        if(origin.getProtocol().equals(url.getProtocol())&&origin.getHost().equals(url.getHost())&&origin.getPort()==url.getPort())connection.setRequestProperty("Authorization",token);
+        try{
+            if(connection.getResponseCode()!=200)throw new IOException("安装包下载失败（HTTP "+connection.getResponseCode()+"）");
+            long declared=connection.getContentLengthLong();if(declared>0&&declared!=release.size)throw new IOException("安装包大小不匹配");
+            java.security.MessageDigest digest=java.security.MessageDigest.getInstance("SHA-256");long count=0;int last=-1;
+            try(InputStream in=connection.getInputStream();OutputStream out=new FileOutputStream(target)){byte[] buffer=new byte[65536];int n;while((n=in.read(buffer))!=-1){if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("下载已取消");count+=n;if(count>release.size)throw new IOException("安装包超过声明容量");digest.update(buffer,0,n);out.write(buffer,0,n);int percent=(int)(count*100/release.size);if(percent!=last){last=percent;progress.accept(percent);}}}
+            StringBuilder hex=new StringBuilder();for(byte b:digest.digest())hex.append(String.format(Locale.ROOT,"%02x",b&255));if(count!=release.size||!hex.toString().equals(release.digest))throw new IOException("安装包校验失败，请重新下载");
+        }finally{connection.disconnect();}
     }
     @Override public void put(String qq,String name,byte[] bytes)throws Exception {
         if(bytes.length>CloudRecords.MAX_BYTES||!name.equals("scores-"+CloudRecords.sha256(bytes)+".json"))throw new IOException("待上传成绩文件校验失败");

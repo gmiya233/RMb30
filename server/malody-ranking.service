@@ -1,0 +1,23 @@
+[Unit]
+Description=Malody leaderboard aggregation
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -B /opt/malody-ranking/launch.py
+Restart=on-failure
+RestartSec=10
+UMask=0022
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/malody-ranking
+# Installer adds only the derived v2 directory as an additional writable path.
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+MemoryMax=384M
+
+[Install]
+WantedBy=multi-user.target

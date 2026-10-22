@@ -83,7 +83,7 @@ def main():
     if not config.exists():
         raise RuntimeError('Missing private build configuration: .secrets/default-reader.json')
     shutil.copyfile(config, ROOT / 'android/assets/default-reader.json')
-    rank_config = ROOT / '.secrets/default-rank.json'
+    rank_config = Path(os.environ.get('MALODY_RANK_CONFIG', str(ROOT / '.secrets/default-rank.json')))
     if not rank_config.exists():
         raise RuntimeError('Missing private build configuration: .secrets/default-rank.json')
     shutil.copyfile(rank_config, ROOT / 'android/assets/default-rank.json')

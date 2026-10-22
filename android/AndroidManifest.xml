@@ -1,7 +1,8 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="17" android:versionName="1.5.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="18" android:versionName="1.5.2">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
   <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
   <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -12,7 +13,7 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
   <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
   <queries><package android:name="moe.shizuku.privileged.api" /><package android:name="me.mugzone.emiria" /></queries>
-  <application android:label="Malody Link" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:debuggable="false" android:usesCleartextTraffic="true" android:extractNativeLibs="true" android:icon="@drawable/icon">
+  <application android:label="Malody Link" android:theme="@style/AppTheme" android:allowBackup="false" android:debuggable="false" android:usesCleartextTraffic="true" android:extractNativeLibs="true" android:icon="@drawable/icon">
     <meta-data android:name="moe.shizuku.client.V3_SUPPORT" android:value="true" />
     <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="cn.gmiya.malodylink.shizuku" android:multiprocess="false" android:enabled="true" android:exported="true" android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     <activity android:name=".MainActivity" android:exported="true">
@@ -20,6 +21,11 @@
     </activity>
     <activity android:name=".InternalReaderActivity" android:exported="false" />
     <activity android:name=".PlayerProfileActivity" android:exported="false" />
+    <activity android:name=".SongCommunityActivity" android:exported="false" />
+    <activity android:name=".UpdateActivity" android:exported="false" />
+    <provider android:name=".UpdateFileProvider" android:authorities="cn.gmiya.malodylink.updates" android:exported="false" android:grantUriPermissions="true">
+      <grant-uri-permission android:pathPrefix="/apk/" />
+    </provider>
     <service android:name=".PairingService" android:exported="false" android:foregroundServiceType="connectedDevice" />
     <service android:name=".PairCodeAccessibilityService" android:label="@string/pair_code_accessibility_label" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
       <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
