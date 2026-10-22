@@ -43,14 +43,15 @@ public final class InternalReaderActivity extends Activity {
         button(wirelessStep,"前往无线调试",this::settings);
         button(wirelessStep,"已开启，继续",()->{wirelessConfirmed=true;refresh();});
         pairStep=section(root);
-        pairStep.addView(label("最后一步 · 输入配对码",20,INK));
+        pairStep.addView(label("最后一步 · 完成系统配对",20,INK));
         pairHint=label("点下方按钮打开系统设置并准备配对通知。\n如果看到开发者选项，先直接点「无线调试」文字进入详情，再点「使用配对码配对设备」。",16,MUTED);pairStep.addView(pairHint);
         pairButton=button(pairStep,"开始配对并自动导入",this::startPairing);
+        button(pairStep,"开启六位码自动识别（可选）",this::automaticPairingSettings);
         pairStep.addView(label("图 1 · 直接点「无线调试」，不只是开开关",16,INK));
         pairStep.addView(new ConnectionGuideView(this,1),new LinearLayout.LayoutParams(-1,-2));
         pairStep.addView(label("图 2 · 点「使用配对码配对设备」",16,INK));
         pairStep.addView(new ConnectionGuideView(this,2),new LinearLayout.LayoutParams(-1,-2));
-        pairStep.addView(label("看到六位码后，保持系统弹窗打开，下拉通知，在 Malody Link 通知中输入。配对成功后自动读取成绩。",16,MUTED));
+        pairStep.addView(label("开启自动识别后，显示六位码并保持窗口打开即可。系统不允许读取时，也可下拉通知手动输入。配对成功后自动读取成绩。",16,MUTED));
         readyStep=section(root);
         readyStep.addView(label("已完成首次授权",20,INK));
         readyStep.addView(label("点一次即可同步。只检查新增或变化的回放；短暂断线会自动重试。",16,MUTED));
@@ -63,6 +64,8 @@ public final class InternalReaderActivity extends Activity {
         button(advanced,"打开无线调试设置",()->{retryOnResume=getSharedPreferences("reader",0).getBoolean("paired",false);settings();});
         button(advanced,"进入开发者选项",this::developerSettings);
         button(advanced,"重新配对",this::startPairing);
+        button(advanced,"六位码自动识别设置",this::automaticPairingSettings);
+        button(advanced,"停用六位码自动识别",()->{getSharedPreferences("reader",0).edit().putBoolean("auto_pair_code",false).apply();PairingService.cancelAutomatic();status.setText("自动识别已停用，仍可在通知中手动输入配对码。");});
         button(advanced,"手动输入连接端口",this::manualConnect);button(advanced,"手动配对 / 分屏输入",this::manualPair);
         button(advanced,"断开读取",()->task(()->{InternalAdb.get(this).disconnect();return "已断开，首次配对信息保留。";}));
         button(advanced,"打开 Malody 6.6.42",()->{Intent launch=getPackageManager().getLaunchIntentForPackage("me.mugzone.emiria");if(launch!=null)startActivity(launch);else status.setText("未找到 Malody 6，请确认已安装。");});
@@ -142,9 +145,11 @@ public final class InternalReaderActivity extends Activity {
         if(busy||LocalScoreSync.isBusy()||LocalSyncService.active){status.setText("同步正在进行；结束后可从连接选项重新配对。");return;}
         if(Build.VERSION.SDK_INT<30){status.setText("本机没有Android 11的系统配对入口，可用原有USB或Shizuku兼容读取。");return;}
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},40);return;}
-        if(PairingService.active){settings();return;}
         startForegroundService(new Intent(this,PairingService.class).setAction("START_AND_SYNC"));
-        status.setText("请点「使用配对码配对设备」，保持窗口打开，下拉通知输入六位码；配对后将自动同步。");settings();
+        status.setText(PairCodeAccessibilityService.automatic(this)?"请打开六位码弹窗，等待自动识别；无需输入。若系统未提供文本，仍可通知手动输入。":"请点「使用配对码配对设备」，保持窗口打开，下拉通知输入六位码；配对后将自动同步。");settings();
+    }
+    private void automaticPairingSettings(){
+        new AlertDialog.Builder(this).setTitle("启用配对码自动识别").setMessage("需要你在系统辅助功能中手动开启「Malody Link 配对码自动识别」。\n\n仅在你点开始配对后的3分钟内，读取系统设置中六位配对码并自动提交到本机。不截图、不保存、不上传；不会自动点击系统授权按钮。\n\n开启后返回App，再点开始配对。若系统限制了文本读取，保留通知手动输入。").setNegativeButton("取消",null).setPositiveButton("前往系统开启",(d,w)->{getSharedPreferences("reader",0).edit().putBoolean("auto_pair_code",true).apply();try{PairCodeAccessibilityService.settings(this);}catch(Exception e){status.setText("请在手机设置 → 辅助功能中开启 Malody Link 配对码自动识别。");}}).show();
     }
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(request==40){if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)startPairing();else status.setText("通知内输入配对码需要通知权限；也可在连接选项中使用分屏手动配对。");}}
     private interface Work {String run()throws Exception;}

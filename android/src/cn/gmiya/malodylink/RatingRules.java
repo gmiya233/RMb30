@@ -34,4 +34,8 @@ public final class RatingRules {
         if(!Double.isFinite(level)||level<=0||judge<1||judge>5)return Double.NaN;
         return normalizedLevel(level)*accuracyFactor(accuracy)*multipliers[judge];
     }
+    public double rating(double raw,String version,double accuracy,int judge){
+        if(judge<1||judge>5)return Double.NaN;
+        return ChartDetails.level(raw,version)*accuracyFactor(accuracy)*multipliers[judge];
+    }
 }

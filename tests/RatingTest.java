@@ -1,5 +1,6 @@
 import cn.gmiya.malodylink.RatingRules;
 import cn.gmiya.malodylink.PosterData;
+import cn.gmiya.malodylink.ChartDetails;
 import java.util.*;
 
 public class RatingTest {
@@ -8,6 +9,16 @@ public class RatingTest {
     private static PosterData.Entry entry(int cid,int sid,String section,double rating){PosterData.Entry e=new PosterData.Entry();e.cid=cid;e.sid=sid;e.section=section;e.converted=rating;e.accuracy=99.5;return e;}
     public static void main(String[] args){
         RatingRules rules=new RatingRules();
+        for(int sc=1;sc<=20;sc++){int expected=sc<=4?12:sc<=13?13:15;check(near(rules.rating(Double.NaN,"SC "+sc,99.5,3),expected),"SC "+sc+" maps to "+expected);}
+        check(near(rules.rating(14,"[6K-LV.14+] RM SC14",99.5,3),15),"SC mapping takes precedence over numeric catalogue level");
+        check(near(rules.rating(32,"SC9",99.8,1),13*1.01*.78),"SC normalized once then accuracy and judge multiplier");
+        check(ChartDetails.sc("SC9.5")==0&&ChartDetails.sc("SC0")==0,"invalid SC values not silently rounded");
+        check(near(rules.rating(24,"4K LV.24",99.5,3),12),"non-SC MaV conversion preserved");
+        PosterData.Board section=new PosterData.Board();section.old.add(entry(1,1,"O",12));section.fresh.add(entry(2,2,"N",15));
+        check(near(section.oldRating(),.6)&&near(section.newRating(),1.5)&&near(section.rating(),.9),"section ratings divide by 20/10 and weighted total divides by 30");
+        section.old.add(entry(3,3,"O",Double.NaN));check(near(section.oldRating(),.6),"unknown rating contributes zero without changing denominator");
+        PosterData.Entry automatic=entry(4,4,"O",13);automatic.level=0;automatic.difficultyVersion="SC9";automatic.manual=true;
+        check(near(automatic.displayLevel(),13),"global judge preview retains SC level");automatic.level=12;automatic.levelOverride=true;check(near(automatic.displayLevel(),12),"explicit manual level overrides SC mapping");
         int[] source={17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35};
         int[] target={9,9,10,10,11,11,11,12,12,12,13,13,13,14,14,14,15,15,15};
         for(int n=0;n<source.length;n++)check(near(RatingRules.normalizedLevel(source[n]),target[n]),"MaV "+source[n]+" -> RM "+target[n]);

@@ -1,0 +1,4 @@
+<resources>
+    <string name="pair_code_accessibility_label">Malody Link 配对码自动识别</string>
+    <string name="pair_code_accessibility_description">在你主动开始配对后的3分钟内，仅从系统设置的无线调试配对窗口读取六位配对码，自动提交到本机配对。不截图，不保存或上传配对码。结束或超时后停止读取；不自动操作系统授权按钮。</string>
+</resources>

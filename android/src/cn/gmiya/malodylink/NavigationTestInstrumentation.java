@@ -15,6 +15,7 @@ public final class NavigationTestInstrumentation extends Instrumentation {
     private void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
     private Object field(Object o,String name)throws Exception{Field f=o.getClass().getDeclaredField(name);f.setAccessible(true);return f.get(o);}
     private TextView find(View v,String label){if(v instanceof TextView&&label.contentEquals(((TextView)v).getText()))return (TextView)v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){TextView found=find(g.getChildAt(i),label);if(found!=null)return found;}}return null;}
+    private boolean described(View v,String label){if(label.contentEquals(v.getContentDescription()==null?"":v.getContentDescription()))return true;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++)if(described(g.getChildAt(i),label))return true;}return false;}
     private void tab(MainActivity a,int n){a.findViewById(0x1020101+n).performClick();}
     private void layout(MainActivity a,int width,int height)throws Exception{
         View screen=(View)field(a,"screen");float d=a.getResources().getDisplayMetrics().density;int w=(int)(width*d),h=(int)(height*d);screen.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));screen.layout(0,0,w,h);
@@ -30,7 +31,9 @@ public final class NavigationTestInstrumentation extends Instrumentation {
         page=(MainActivity)waitForMonitorWithTimeout(launcher,5000);removeMonitor(launcher);check(page!=null,"main activity visible");final MainActivity a=page;final Throwable[] failure={null};
         runOnMainSync(()->{Configuration saved=new Configuration(a.getResources().getConfiguration());try{
             check(find(a.getWindow().getDecorView(),"我的成绩")!=null,"home overview");check(find(a.getWindow().getDecorView(),"最近成绩")!=null,"recent scores on home");check(find(a.getWindow().getDecorView(),"其他服务器 / 账号")==null,"settings are not on home");
-            tab(a,1);check(find(a.getWindow().getDecorView(),"保存到相册")!=null,"B30 controls embedded");check(a.findViewById(0x1020102).isSelected(),"B30 selected");layout(a,375,812);layout(a,812,375);
+            tab(a,1);check(described(a.getWindow().getDecorView(),"保存到相册")&&described(a.getWindow().getDecorView(),"选择称号"),"B30 save/title icon controls embedded and labeled");check(a.findViewById(0x1020102).isSelected(),"B30 selected");layout(a,375,812);layout(a,812,375);
+            check(described(a.getWindow().getDecorView(),"调整与示例")&&described(a.getWindow().getDecorView(),"放大 / 适应屏幕"),"adjust and fit actions have labeled icons");
+            check(find(a.getWindow().getDecorView(),"调整与示例")==null&&find(a.getWindow().getDecorView(),"放大 / 适应屏幕")==null,"large text buttons removed");
             tab(a,2);check(find(a.getWindow().getDecorView(),"QQ 云存档")!=null&&find(a.getWindow().getDecorView(),"连接设置 / 首次配对")!=null,"cloud and connection controls in settings");layout(a,375,812);
             Configuration large=new Configuration(saved);large.fontScale=2f;a.getResources().updateConfiguration(large,a.getResources().getDisplayMetrics());
             tab(a,0);layout(a,375,812);tab(a,1);layout(a,375,812);layout(a,812,375);

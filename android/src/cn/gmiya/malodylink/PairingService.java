@@ -10,6 +10,10 @@ public final class PairingService extends Service {
     static final String CODE="pairing_code",CHANNEL="local_reader_pairing";
     private static final int ID=30;
     public static volatile boolean active;public static volatile String phase="";
+    private static volatile long automaticUntil;
+    public static boolean canReadAutomatic(){return active&&automaticUntil>SystemClock.elapsedRealtime();}
+    public static void cancelAutomatic(){automaticUntil=0;}
+    public static synchronized boolean submitAutomatic(Context c,String code){if(!canReadAutomatic()||!PairCodeAccessibilityService.automatic(c)||code==null||!code.matches("[0-9]{6}"))return false;automaticUntil=0;try{c.startService(new Intent(c,PairingService.class).setAction("PAIR").putExtra(CODE,code));return true;}catch(RuntimeException unavailable){return false;}}
     private LocalAdbDiscovery discovery;private volatile int port;private volatile boolean pairing;
     private final Handler handler=new Handler(Looper.getMainLooper());private final ExecutorService worker=Executors.newSingleThreadExecutor();
     @Override public void onCreate(){super.onCreate();active=true;((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(new NotificationChannel(CHANNEL,"本机成绩读取配对",NotificationManager.IMPORTANCE_HIGH));}
@@ -24,13 +28,15 @@ public final class PairingService extends Service {
     private void notifyText(String text,boolean input){phase=text;((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(ID,notification(text,input));sendBroadcast(new Intent(LocalScoreSync.UPDATED).setPackage(getPackageName()));}
     @Override public int onStartCommand(Intent intent,int flags,int id){
         if(pairing)return START_NOT_STICKY;
-        phase="请点「使用配对码配对设备」，再在通知中输入六位码";
+        boolean submitting=intent!=null&&"PAIR".equals(intent.getAction());
+        if(!submitting)automaticUntil=PairCodeAccessibilityService.automatic(this)?SystemClock.elapsedRealtime()+180000:0;
+        phase=canReadAutomatic()?"请打开六位码窗口，等待自动识别；也可在通知中输入":"请点「使用配对码配对设备」，再在通知中输入六位码";
         startForeground(ID,notification(phase,true));
         if(intent!=null&&"PAIR".equals(intent.getAction())){
             String code=intent.getStringExtra(CODE);intent.removeExtra(CODE);
             if(pairing)return START_NOT_STICKY;
             if(code==null||!code.trim().matches("[0-9]{6}")){notifyText("配对码应为六位数字，请重新输入",true);return START_NOT_STICKY;}
-            pairing=true;notifyText("正在完成系统配对…",false);final String entered=code.trim();final int targetPort=port;
+            cancelAutomatic();pairing=true;notifyText("正在完成系统配对…",false);final String entered=code.trim();final int targetPort=port;
             worker.execute(()->{String message;boolean paired=false;try{
                 if(!InternalAdb.get(this).pairLocal(targetPort==0?LocalAdbDiscovery.find(this,LocalAdbDiscovery.PAIR,6000):targetPort,entered))throw new Exception("配对失败");
                 getSharedPreferences("reader",0).edit().putBoolean("paired",true).apply();paired=true;
@@ -40,9 +46,9 @@ public final class PairingService extends Service {
                 String done=message;handler.post(()->{notifyText(done,false);stopForeground(STOP_FOREGROUND_DETACH);stopSelf();});});
             return START_NOT_STICKY;
         }
-        if(discovery==null)try{discovery=new LocalAdbDiscovery(this,LocalAdbDiscovery.PAIR,p->{port=p;if(!pairing)notifyText("已找到本机配对窗口。点下方输入六位配对码。",true);});}catch(Exception e){notifyText("无法发现配对窗口，请使用App内的手动配对",false);stopForeground(STOP_FOREGROUND_DETACH);stopSelf();}
+        if(discovery==null)try{discovery=new LocalAdbDiscovery(this,LocalAdbDiscovery.PAIR,p->{port=p;if(!pairing)notifyText(canReadAutomatic()?"已找到配对窗口，等待自动识别六位码…":"已找到本机配对窗口。点下方输入六位配对码。",true);});}catch(Exception e){notifyText("无法发现配对窗口，请使用App内的手动配对",false);stopForeground(STOP_FOREGROUND_DETACH);stopSelf();}
         handler.removeCallbacksAndMessages(null);handler.postDelayed(()->{if(!pairing){notifyText("配对等待已结束，可回App重新开始",false);stopForeground(STOP_FOREGROUND_DETACH);stopSelf();}},180000);
         return START_NOT_STICKY;
     }
-    @Override public void onDestroy(){active=false;phase="";handler.removeCallbacksAndMessages(null);if(discovery!=null)discovery.close();worker.shutdown();sendBroadcast(new Intent(LocalScoreSync.UPDATED).setPackage(getPackageName()));super.onDestroy();}
+    @Override public void onDestroy(){cancelAutomatic();active=false;phase="";handler.removeCallbacksAndMessages(null);if(discovery!=null)discovery.close();worker.shutdown();sendBroadcast(new Intent(LocalScoreSync.UPDATED).setPackage(getPackageName()));super.onDestroy();}
 }
