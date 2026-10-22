@@ -1,0 +1,31 @@
+package cn.gmiya.malodylink;
+
+import org.json.*;
+import java.util.*;
+
+/** Uniform default rating rules; never reads a viewer's local preview preferences. */
+public final class RankingData {
+    public static final class Score {public String qq,name;public int cid,judge,rank;public long score,played;public double rating,accuracy;public JSONObject record;}
+    public static final class Player {public String qq,name;public double rating,oldRating,newRating;public int oldCount,newCount,rank;public final Map<Integer,Score> best=new HashMap<>();}
+    public static final Comparator<Score> SCORE_ORDER=(a,b)->{int r=Double.compare(b.rating,a.rating);if(r==0)r=Double.compare(b.accuracy,a.accuracy);if(r==0)r=Long.compare(b.score,a.score);return r!=0?r:a.qq.compareTo(b.qq);};
+    public static Player player(String qq,JSONArray records,JSONArray charts)throws Exception {
+        CloudRecords.qq(qq);JSONArray valid=CloudRecords.merge(new JSONArray(),records,new CloudRecords.Catalogue(charts)).scores;Map<Integer,JSONObject> catalog=new HashMap<>();for(int i=0;i<charts.length();i++){JSONObject c=charts.getJSONObject(i);catalog.put(c.getInt("cid"),c);}
+        Set<String> fresh=freshSongs(charts);Player player=new Player();player.qq=qq;player.name="QQ "+qq;long newest=-1;List<PosterData.Entry> entries=new ArrayList<>();RatingRules rules=new RatingRules();
+        for(int i=0;i<valid.length();i++){JSONObject s=valid.getJSONObject(i),c=catalog.get(s.getInt("cid"));long played=s.optLong("played_at");String name=s.optString("player").trim();if(!name.isEmpty()&&played>newest){player.name=name;newest=played;}
+            JSONObject raw=s.optJSONObject("raw_score_fields");int judge=raw==null?0:raw.optInt("4");double accuracy=s.optDouble("accuracy_candidate"),level=SongCatalogue.rawLevel(c),rating=rules.rating(level,c.optString("version"),accuracy,judge);
+            PosterData.Entry e=new PosterData.Entry();e.cid=c.getInt("cid");e.sid=c.optInt("sid",e.cid);e.section=(c.optInt("promote")==1||c.optBoolean("promote")||c.optString("path").startsWith("promote/"))?"N":"O";e.converted=rating;e.accuracy=accuracy;e.score=s.optLong("score_candidate");if(fresh.contains(e.identity()))e.section="N";if(Double.isFinite(rating))entries.add(e);
+            if(!Double.isFinite(rating))continue;Score row=new Score();row.qq=qq;row.cid=e.cid;row.rating=rating;row.accuracy=accuracy;row.score=e.score;row.played=played;row.judge=judge;row.record=s;Score previous=player.best.get(row.cid);if(previous==null||SCORE_ORDER.compare(row,previous)<0)player.best.put(row.cid,row);
+        }
+        for(Score s:player.best.values())s.name=player.name;PosterData.Board board=PosterData.group(entries);player.rating=board.rating();player.oldRating=board.oldRating();player.newRating=board.newRating();player.oldCount=board.old.size();player.newCount=board.fresh.size();return player;
+    }
+    public static Set<String> freshSongs(JSONArray charts){Set<String> fresh=new HashSet<>();for(int i=0;i<charts.length();i++){JSONObject c=charts.optJSONObject(i);if(c==null)continue;if(c.optBoolean("promote")||c.optInt("promote")==1||c.optString("path").startsWith("promote/")){int sid=c.optInt("sid");fresh.add(sid>0?"sid:"+sid:"cid:"+c.optInt("cid"));}}return fresh;}
+    /** Fixed song categories make top-K summaries safely mergeable across devices. */
+    public static JSONArray shortlist(String qq,JSONArray records,JSONArray charts)throws Exception {
+        Player p=player(qq,records,charts);Map<Integer,JSONObject> catalog=new HashMap<>();for(int i=0;i<charts.length();i++){JSONObject c=charts.getJSONObject(i);catalog.put(c.getInt("cid"),c);}Set<String> fresh=freshSongs(charts);List<PosterData.Entry> entries=new ArrayList<>();
+        for(Score s:p.best.values()){JSONObject c=catalog.get(s.cid);PosterData.Entry e=new PosterData.Entry();e.cid=s.cid;e.sid=c.optInt("sid");e.converted=s.rating;e.accuracy=s.accuracy;e.score=s.score;e.section=fresh.contains(e.identity())?"N":"O";entries.add(e);}PosterData.Board board=PosterData.group(entries);JSONArray result=new JSONArray();List<PosterData.Entry> selected=new ArrayList<>(board.old);selected.addAll(board.fresh);selected.sort((a,b)->Integer.compare(a.cid,b.cid));for(PosterData.Entry e:selected)result.put(p.best.get(e.cid).record);return result;
+    }
+    public static List<Player> total(Collection<Player> players){List<Player> rows=new ArrayList<>(players);rows.sort((a,b)->{int r=Double.compare(b.rating,a.rating);return r!=0?r:a.qq.compareTo(b.qq);});for(int i=0;i<rows.size();i++)rows.get(i).rank=i>0&&Double.compare(rows.get(i).rating,rows.get(i-1).rating)==0?rows.get(i-1).rank:i+1;return rows;}
+    public static List<Score> chart(Collection<Player> players,int cid){List<Score> rows=new ArrayList<>();for(Player p:players){Score s=p.best.get(cid);if(s!=null)rows.add(s);}rows.sort(SCORE_ORDER);for(int i=0;i<rows.size();i++){Score s=rows.get(i);s.rank=i>0&&Double.compare(s.rating,rows.get(i-1).rating)==0&&Double.compare(s.accuracy,rows.get(i-1).accuracy)==0&&s.score==rows.get(i-1).score?rows.get(i-1).rank:i+1;}return rows;}
+    public static JSONObject encode(Player p)throws Exception {JSONArray best=new JSONArray();List<Integer> ids=new ArrayList<>(p.best.keySet());Collections.sort(ids);for(int cid:ids){Score s=p.best.get(cid);best.put(new JSONObject().put("cid",cid).put("rating",s.rating).put("accuracy",s.accuracy).put("score",s.score).put("played",s.played).put("judge",s.judge));}return new JSONObject().put("qq",p.qq).put("name",p.name).put("rating",p.rating).put("o",p.oldRating).put("n",p.newRating).put("oc",p.oldCount).put("nc",p.newCount).put("best",best);}
+    public static Player decode(JSONObject o)throws Exception {Player p=new Player();p.qq=CloudRecords.qq(o.getString("qq"));p.name=o.getString("name");p.rating=o.getDouble("rating");p.oldRating=o.getDouble("o");p.newRating=o.getDouble("n");p.oldCount=o.getInt("oc");p.newCount=o.getInt("nc");JSONArray rows=o.getJSONArray("best");for(int i=0;i<rows.length();i++){JSONObject r=rows.getJSONObject(i);Score s=new Score();s.qq=p.qq;s.name=p.name;s.cid=r.getInt("cid");s.rating=r.getDouble("rating");s.accuracy=r.getDouble("accuracy");s.score=r.getLong("score");s.played=r.getLong("played");s.judge=r.getInt("judge");p.best.put(s.cid,s);}return p;}
+}

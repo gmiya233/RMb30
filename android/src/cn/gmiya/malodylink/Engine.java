@@ -24,7 +24,11 @@ public final class Engine {
     public Engine(Context ctx)throws Exception {
         context=ctx;profile=ScoreStore.profile(ctx);server=ctx.getSharedPreferences("settings",0).getString("server",server);
         String session=sessionTokens.get(server);if(session!=null)token=session;
-        catalog=load("catalog.json",new JSONObject(new String(read(ctx.getAssets().open("catalog.json"),8000000),StandardCharsets.UTF_8)));
+        JSONObject bundled=new JSONObject(new String(read(ctx.getAssets().open("catalog.json"),8000000),StandardCharsets.UTF_8));
+        catalog=load("catalog.json",bundled);
+        // Older local catalogues lack descriptive fields. Enrich only matching revisions,
+        // without restoring removed charts or changing score identities.
+        if(server.equals(bundled.optString("server"))){Map<Integer,JSONObject> descriptions=new HashMap<>();JSONArray source=bundled.getJSONArray("charts");for(int i=0;i<source.length();i++){JSONObject row=source.getJSONObject(i);descriptions.put(row.optInt("cid"),row);}JSONArray current=catalog.getJSONArray("charts");for(int i=0;i<current.length();i++){JSONObject row=current.getJSONObject(i),base=descriptions.get(row.optInt("cid"));if(base!=null&&row.optString("server_hash").equals(base.optString("server_hash")))for(String key:new String[]{"bpm","creator","artist","cover","background"})if((!row.has(key)||row.isNull(key)||row.optString(key).isEmpty())&&base.has(key))row.put(key,base.get(key));}}
         aliases=load("aliases.json",new JSONObject());scores=loadArray("scores.json");
         // Keep only results still present in this exact catalogue revision.
         JSONArray filtered=new JSONArray();for(int i=0;i<scores.length();i++){JSONObject s=scores.getJSONObject(i);if(active(s.optInt("cid"),s.optString("server_hash")))filtered.put(s);}scores=filtered;
@@ -68,8 +72,8 @@ public final class Engine {
         try{
             try(FileOutputStream out=new FileOutputStream(temp)){out.write(bytes);}
             JSONArray rows=new JSONArray();SQLiteDatabase db=SQLiteDatabase.openDatabase(temp.getPath(),null,SQLiteDatabase.OPEN_READONLY);
-            try(Cursor cursor=db.rawQuery("SELECT c.cid,c.hash,c.path,c.mc_name,c.version,c.mode,s.title,s.artist,s.sid,c.level,s.promote,s.cover,s.background FROM charts c JOIN songs s ON c.sid=s.sid WHERE c.exist=1 AND s.exist=1",null)){
-                String[] names={"cid","server_hash","path","mc_name","version","mode","title","artist","sid","level","promote","cover","background"};while(cursor.moveToNext()){JSONObject item=new JSONObject();for(int i=0;i<names.length;i++)item.put(names[i],cursor.getType(i)==Cursor.FIELD_TYPE_INTEGER?cursor.getLong(i):cursor.getString(i));rows.put(item);}
+            try(Cursor cursor=db.rawQuery("SELECT c.cid,c.hash,c.path,c.mc_name,c.version,c.mode,s.title,s.artist,s.sid,c.level,s.promote,s.cover,s.background,s.bpm,c.creator FROM charts c JOIN songs s ON c.sid=s.sid WHERE c.exist=1 AND s.exist=1",null)){
+                String[] names={"cid","server_hash","path","mc_name","version","mode","title","artist","sid","level","promote","cover","background","bpm","creator"};while(cursor.moveToNext()){JSONObject item=new JSONObject();for(int i=0;i<names.length;i++)item.put(names[i],cursor.getType(i)==Cursor.FIELD_TYPE_INTEGER?cursor.getLong(i):cursor.getType(i)==Cursor.FIELD_TYPE_FLOAT?cursor.getDouble(i):cursor.getString(i));rows.put(item);}
             }finally{db.close();}
             if(rows.length()==0)throw new IOException("服务器当前没有有效谱面，未替换清单");
             server=address;JSONObject next=new JSONObject().put("server",server).put("updated_at",System.currentTimeMillis()/1000).put("charts",rows);

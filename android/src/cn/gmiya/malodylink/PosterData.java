@@ -59,7 +59,7 @@ public final class PosterData {
                 if(judgeOverride>0){e.judge=judgeOverride;e.manual=true;}e.converted=rules.rating(e.level,e.difficultyVersion,e.accuracy,e.judge);if(e.levelOverride)e.converted=rules.converted(e.level,e.accuracy,e.judge);entries.add(e);
             }
         }
-        Board board=group(entries);board.demo=demo;if(!entries.isEmpty())board.player=entries.get(0).player;if(appearance){board.player=LocalPlayerProfile.nickname(context,board.player);board.title=LocalPlayerProfile.title(context,engine);}return board;
+        Set<String> promoted=RankingData.freshSongs(engine.charts());for(Entry e:entries)if(promoted.contains(e.identity()))e.section="N";Board board=group(entries);board.demo=demo;if(!entries.isEmpty())board.player=entries.get(0).player;if(appearance){board.player=LocalPlayerProfile.nickname(context,board.player);board.title=LocalPlayerProfile.title(context,engine);}return board;
     }
     private static Entry from(JSONObject c){Entry e=new Entry();e.cid=c.optInt("cid");e.sid=c.optInt("sid",e.cid);e.title=c.optString("title");e.version=c.optString("version");e.difficultyVersion=e.version;e.level=level(c);
         e.section=(c.optBoolean("promote",false)||c.optInt("promote",0)==1||c.optString("path").startsWith("promote/"))?"N":"O";return e;}

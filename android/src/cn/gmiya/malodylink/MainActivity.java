@@ -23,7 +23,8 @@ import rikka.shizuku.Shizuku;
 
 public final class MainActivity extends Activity {
     private static final int BG=0xff0f172a,CARD=0xff19263b,INK=0xfff1f5f9,MUTED=0xffb1bfd2,GREEN=0xff74e4d6;
-    private int selectedTab;private final int[] scrollPositions=new int[3];private ScrollView currentScroll;private LinearLayout screen;private PosterPanel posterPanel;private Bitmap homeImage;private int renderGeneration;private String lastMessage="";
+    private int selectedTab;private final int[] scrollPositions=new int[5];private ScrollView currentScroll;private LinearLayout screen;private PosterPanel posterPanel;private Bitmap homeImage;private int renderGeneration;private String lastMessage="";
+    private RankingPanel rankingPanel;private boolean rankSingle;private int rankCid;private String songQuery="",rankQuery="";
     private final ExecutorService previews=Executors.newSingleThreadExecutor();
     private Engine engine;private LinearLayout root;private TextView status;private volatile boolean busy=false;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -44,13 +45,13 @@ public final class MainActivity extends Activity {
         loadedCloud=getSharedPreferences("cloud",0).getLong("last_sync",0);
         IntentFilter updates=new IntentFilter(LocalScoreSync.UPDATED);if(Build.VERSION.SDK_INT>=33)registerReceiver(syncUpdates,updates,Context.RECEIVER_NOT_EXPORTED);else registerReceiver(syncUpdates,updates);syncReceiverRegistered=true;
         Shizuku.addRequestPermissionResultListener(permissionListener);
-        selectedTab=state==null?0:state.getInt("tab",0);render();if(new File(getFilesDir(),"inbox/manifest.json").exists())runTask(()->saveAndCloud(()->"USB 导入完成：新增 "+engine.importUsb()+" 条成绩"));
+        selectedTab=state==null?0:Math.max(0,Math.min(4,state.getInt("tab",0)));if(state!=null){rankSingle=state.getBoolean("rankSingle");rankCid=state.getInt("rankCid");songQuery=state.getString("songQuery","");rankQuery=state.getString("rankQuery","");}render();if(new File(getFilesDir(),"inbox/manifest.json").exists())runTask(()->saveAndCloud(()->"USB 导入完成：新增 "+engine.importUsb()+" 条成绩"));
     }
     @Override protected void onResume(){super.onResume();reloadSynced();if(engine!=null&&!busy&&new File(getFilesDir(),"inbox/manifest.json").exists())runTask(()->saveAndCloud(()->"USB 导入完成：新增 "+engine.importUsb()+" 条成绩"));}
-    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putInt("tab",selectedTab);}
+    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);state.putInt("tab",selectedTab);state.putBoolean("rankSingle",rankSingle);state.putInt("rankCid",rankCid);state.putString("songQuery",songQuery);state.putString("rankQuery",rankQuery);}
     @Override public void onBackPressed(){if(selectedTab!=0)selectTab(0);else super.onBackPressed();}
     @Override public void onRequestPermissionsResult(int req,String[] p,int[] r){super.onRequestPermissionsResult(req,p,r);if(posterPanel!=null)posterPanel.onRequestPermissionsResult(req,p,r);}
-    @Override protected void onDestroy(){renderGeneration++;if(posterPanel!=null)posterPanel.close();previews.shutdown();if(syncReceiverRegistered)unregisterReceiver(syncUpdates);Shizuku.removeRequestPermissionResultListener(permissionListener);if(serviceArgs!=null&&Shizuku.pingBinder())try{Shizuku.unbindUserService(serviceArgs,connection,true);}catch(Exception ignored){}worker.shutdown();super.onDestroy();}
+    @Override protected void onDestroy(){renderGeneration++;if(posterPanel!=null)posterPanel.close();if(rankingPanel!=null)rankingPanel.close();previews.shutdown();if(syncReceiverRegistered)unregisterReceiver(syncUpdates);Shizuku.removeRequestPermissionResultListener(permissionListener);if(serviceArgs!=null&&Shizuku.pingBinder())try{Shizuku.unbindUserService(serviceArgs,connection,true);}catch(Exception ignored){}worker.shutdown();super.onDestroy();}
     private void reloadSynced(){
         long latest=getSharedPreferences("reader",0).getLong("last_sync",0),cloud=getSharedPreferences("cloud",0).getLong("last_sync",0);
         if(engine!=null&&!busy&&!LocalScoreSync.isBusy()&&!LocalSyncService.active&&!CloudSyncService.active&&(latest>loadedSync||cloud>loadedCloud)){
@@ -68,12 +69,15 @@ public final class MainActivity extends Activity {
     private void render(){
         rememberScroll();renderGeneration++;cloudStatus=null;status=null;
         if(posterPanel!=null){posterPanel.close();posterPanel=null;}
+        if(rankingPanel!=null){rankingPanel.close();rankingPanel=null;}
         // Bitmaps displayed by an old detached view are reclaimed by Android, never recycled during drawing.
         homeImage=null;
         screen=new LinearLayout(this);screen.setOrientation(1);screen.setBackgroundColor(BG);setContentView(screen);
         screen.setOnApplyWindowInsetsListener((v,in)->{screen.setPadding(in.getSystemWindowInsetLeft(),in.getSystemWindowInsetTop(),in.getSystemWindowInsetRight(),in.getSystemWindowInsetBottom());return in;});
         FrameLayout content=new FrameLayout(this);screen.addView(content,new LinearLayout.LayoutParams(-1,0,1));currentScroll=null;
         if(selectedTab==1){posterPanel=new PosterPanel(this,false);content.addView(posterPanel.view(),new FrameLayout.LayoutParams(-1,-1));}
+        else if(selectedTab==2){rankingPanel=new RankingPanel(this,engine,rankSingle,rankCid,rankQuery,(single,cid)->{rankSingle=single;rankCid=cid;},q->rankQuery=q);content.addView(rankingPanel,new FrameLayout.LayoutParams(-1,-1));}
+        else if(selectedTab==3){content.addView(new SongPanel(this,engine,songQuery,q->songQuery=q,(song,cid)->{rankSingle=true;rankCid=cid;selectTab(2);},false),new FrameLayout.LayoutParams(-1,-1));}
         else{
             currentScroll=new ScrollView(this);currentScroll.setFillViewport(true);currentScroll.setClipToPadding(false);
             root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(20),dp(24),dp(20),dp(24));
@@ -82,9 +86,9 @@ public final class MainActivity extends Activity {
             final ScrollView scroll=currentScroll;final int position=scrollPositions[selectedTab];scroll.post(()->scroll.scrollTo(0,position));
         }
         View line=new View(this);line.setBackgroundColor(0xff2a374e);screen.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
-        LinearLayout nav=new LinearLayout(this);nav.setId(0x1020100);nav.setPadding(dp(12),dp(6),dp(12),dp(6));nav.setBackgroundColor(0xff131e31);nav.setGravity(Gravity.CENTER);
-        String[] labels={"首页","B30","设置"};for(int i=0;i<3;i++){final int tab=i;boolean active=i==selectedTab;Button item=new Button(this);item.setId(0x1020101+i);item.setText(labels[i]);item.setTextSize(12);item.setAllCaps(false);item.setTextColor(active?GREEN:MUTED);item.setTypeface(Typeface.DEFAULT,active?Typeface.BOLD:Typeface.NORMAL);item.setSelected(active);item.setMinWidth(0);item.setMinimumWidth(0);item.setMinHeight(dp(64));item.setPadding(dp(8),dp(8),dp(8),dp(8));
-            NavIcon icon=new NavIcon(i,active?GREEN:MUTED);icon.setBounds(0,0,dp(23),dp(23));item.setCompoundDrawables(null,icon,null,null);item.setCompoundDrawablePadding(dp(4));item.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3374e4d6),shape(active?0xff203c4b:0x00131e31,16),shape(Color.WHITE,16)));item.setContentDescription(labels[i]+(active?"，当前页面":""));LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,-2,1);np.setMargins(dp(4),0,dp(4),0);nav.addView(item,np);item.setOnClickListener(v->selectTab(tab));}
+        LinearLayout nav=new LinearLayout(this);nav.setId(0x1020100);nav.setPadding(dp(8),dp(6),dp(8),dp(6));nav.setBackgroundColor(0xff131e31);nav.setGravity(Gravity.CENTER);
+        String[] labels={"首页","B30","排行榜","歌曲","设置"};int[] icons={0,1,9,10,2};for(int i=0;i<labels.length;i++){final int tab=i;boolean active=i==selectedTab;Button item=new Button(this);item.setId(0x1020101+i);item.setText(labels[i]);item.setTextSize(12);item.setAllCaps(false);item.setTextColor(active?GREEN:MUTED);item.setTypeface(Typeface.DEFAULT,active?Typeface.BOLD:Typeface.NORMAL);item.setSelected(active);item.setMinWidth(0);item.setMinimumWidth(0);item.setMinHeight(dp(64));item.setPadding(dp(2),dp(8),dp(2),dp(8));item.setMaxLines(1);item.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+            NavIcon icon=new NavIcon(icons[i],active?GREEN:MUTED);icon.setBounds(0,0,dp(23),dp(23));item.setCompoundDrawables(null,icon,null,null);item.setCompoundDrawablePadding(dp(4));item.setBackground(new RippleDrawable(ColorStateList.valueOf(0x3374e4d6),shape(active?0xff203c4b:0x00131e31,16),shape(Color.WHITE,16)));item.setContentDescription(labels[i]+(active?"，当前页面":""));LinearLayout.LayoutParams np=new LinearLayout.LayoutParams(0,-2,1);np.setMargins(dp(2),0,dp(2),0);nav.addView(item,np);item.setOnClickListener(v->selectTab(tab));}
         screen.addView(nav,new LinearLayout.LayoutParams(-1,-2));screen.requestApplyInsets();
     }
     private void heading(String title,String subtitle){root.addView(text("MALODY LINK",12,GREEN,true));space(root,8);root.addView(text(title,28,INK,true));space(root,4);root.addView(text(subtitle,14,MUTED,false));space(root,24);}
@@ -134,7 +138,7 @@ public final class MainActivity extends Activity {
         long updated=engine.catalog.optLong("updated_at");server.addView(text("清单更新："+date(updated),12,MUTED,false));
         button(server,"更新谱库（默认账号）",false,()->runTask(()->DefaultCatalog.refresh(this,engine,true,this::message)));button(server,"其他服务器 / 账号",false,this::login);button(server,"导出匹配成绩 JSON",false,()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"malody-link-scores.json");startActivityForResult(i,11);});
 
-        LinearLayout about=card();about.addView(text("关于 Malody Link",18,INK,true));space(about,8);about.addView(text("1.4.0 · O20 + N10\n仅收录当前服务器谱库成绩；预览参数不改写原始记录。",13,MUTED,false));
+        LinearLayout about=card();about.addView(text("关于 Malody Link",18,INK,true));space(about,8);about.addView(text("1.5.1 · O20 + N10\n仅收录当前服务器谱库成绩；预览参数不改写原始记录。",13,MUTED,false));
         space(root,8);root.addView(text("QQ机器人尚未接入；成绩数值字段仍待核对。",12,MUTED,false));
     }
     private int validAliases(){int count=0;Iterator<String> it=engine.aliases.keys();while(it.hasNext()){JSONObject a=engine.aliases.optJSONObject(it.next());if(a!=null&&engine.active(a.optInt("cid"),a.optString("server_hash")))count++;}return count;}
