@@ -42,6 +42,14 @@ jobs:
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"]))')
           xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-UITests.xcresult test | tee build/ios-ui-tests.log
+      - name: Export simulator screenshots
+        if: always() && hashFiles('build/iOS-UITests.xcresult/Info.plist') != ''
+        run: xcrun xcresulttool export attachments --path build/iOS-UITests.xcresult --output-path build/ios-screenshots
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && hashFiles('build/ios-screenshots/**') != ''
+        with:
+          name: iOS-preview-screenshots
+          path: build/ios-screenshots
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: hashFiles('dist/*.ipa') != ''
         with:

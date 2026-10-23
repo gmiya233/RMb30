@@ -10,14 +10,17 @@ final class AppUITests: XCTestCase {
     }
     func testLocalFolderImportAndRepeat() throws {
         let sync = app.buttons["同步本机成绩"]
-        XCTAssertTrue(sync.waitForExistence(timeout: 15)); sync.tap()
+        XCTAssertTrue(sync.waitForExistence(timeout: 15))
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: sync)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed)
+        sync.tap()
         let result = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "新增")).firstMatch
         XCTAssertTrue(result.waitForExistence(timeout: 25))
         XCTAssertTrue(app.staticTexts["820,594"].waitForExistence(timeout: 10))
         sync.tap()
         let repeated = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "未变化 1")).firstMatch
         XCTAssertTrue(repeated.waitForExistence(timeout: 25))
-        XCTAssertEqual(app.staticTexts["820,594"].count, 1)
+        XCTAssertEqual(app.staticTexts.matching(identifier: "820,594").count, 1)
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "Local import on simulator"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
     func testFiveDestinationsAndPoster() throws {
