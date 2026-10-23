@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 import importlib.util
 import re
-from b30_data import prepare
+from b30_data import prepare, artwork_candidates
 
 
 def creator_filter():
@@ -21,7 +21,7 @@ def public_catalogue(doc):
     visible = creator_filter()
     fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote')
     return {'server': doc['server'], 'charts': [
-        {k: row[k] for k in fields if k in row} | {'search_visible': visible(str(row.get('creator') or ''))}
+        {k: row[k] for k in fields if k in row} | {'search_visible': visible(str(row.get('creator') or '')), 'artworks': artwork_candidates(row)}
         for row in doc['charts']]}
 
 

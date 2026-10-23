@@ -27,6 +27,16 @@ def identity(chart):
     return ('sid', sid) if isinstance(sid, int) and sid > 0 else ('cid', chart['cid'])
 
 
+def artwork_candidates(chart):
+    candidates = []
+    for path in [chart.get('cover'), chart.get('background')]:
+        clean = str(path or '').replace('\\', '/').strip('/')
+        if clean and '..' not in clean.split('/'):
+            candidates.append(hashlib.sha256(clean.encode()).hexdigest())
+    candidates.extend(chart.get('artwork_fallbacks', []))
+    return list(dict.fromkeys(candidates))
+
+
 def prepare(player, catalogue, revision, updated):
     charts = {c['cid']: c for c in catalogue['charts']}
     fresh = {identity(c) for c in charts.values() if c.get('promote') or str(c.get('path', '')).startswith('promote/')}
@@ -42,12 +52,7 @@ def prepare(player, catalogue, revision, updated):
     old, new = [], []
     for key, score in best.items():
         chart = charts[score['cid']]
-        candidates = []
-        for path in [chart.get('cover'), chart.get('background')]:
-            clean = str(path or '').replace('\\', '/').strip('/')
-            if clean and '..' not in clean.split('/'):
-                candidates.append(hashlib.sha256(clean.encode()).hexdigest())
-        candidates.extend(chart.get('artwork_fallbacks', []))
+        candidates = artwork_candidates(chart)
         row = dict(score, title=chart.get('title') or '未命名', version=chart.get('version') or '',
                    level=level(chart.get('level'), chart.get('version')),
                    artwork=candidates[0] if candidates else '', artworks=list(dict.fromkeys(candidates)))

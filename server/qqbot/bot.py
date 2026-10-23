@@ -9,6 +9,7 @@ import base64
 
 from ranking_queries import Queries
 from b30_commands import B30Commands, command_parts
+from song_search import SongSearch
 
 
 class Gate:
@@ -55,6 +56,7 @@ def main():
                       config.get('font', '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'),
                       config.get('artwork', '/var/lib/malody-qqbot/artwork'))
     gate = Gate()
+    song_search = SongSearch(queries, b30.font, [b30.artwork, Path(config['catalogue']).parent / 'thumbs'])
     slots = asyncio.Semaphore(8)
     allowed = set(config.get('allowed_groups', []))
 
@@ -71,6 +73,8 @@ def main():
                 async with slots:
                     if command_parts(message.content)[0] in b30.COMMANDS:
                         reply = await asyncio.wait_for(asyncio.to_thread(b30.execute, message.group_openid, message.author.member_openid, message.content), timeout=20)
+                    elif command_parts(message.content)[0] == '查歌':
+                        reply = await asyncio.wait_for(asyncio.to_thread(song_search.execute, message.content), timeout=10)
                     else:
                         reply = await asyncio.wait_for(asyncio.to_thread(queries.execute, message.content), timeout=10)
                     if isinstance(reply, bytes):
