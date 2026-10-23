@@ -46,22 +46,22 @@ struct PosterCanvas: View {
         }
     }
     private func posterCard(_ row: RatedScore, index: Int, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .top, spacing: 10) {
                 ZStack(alignment: .topLeading) {
-                    if let image = UIImage(contentsOfFile: LocalPaths.jacket(row.chart).path) { Image(uiImage: image).resizable().scaledToFill().frame(width: 90, height: 90).clipped() }
-                    else { Image(systemName: "music.note").resizable().scaledToFit().padding(22).frame(width: 90, height: 90).background(Palette.selected).foregroundStyle(color) }
+                    if let image = UIImage(contentsOfFile: LocalPaths.jacket(row.chart).path) { Image(uiImage: image).resizable().scaledToFill().frame(width: 80, height: 94).clipped() }
+                    else { Image(systemName: "music.note").resizable().scaledToFit().padding(22).frame(width: 80, height: 94).background(Palette.selected).foregroundStyle(color) }
                     Text(String(format: "%02d", index)).font(.system(size: 15, weight: .bold)).padding(3).background(color).foregroundStyle(.white)
                 }.clipShape(RoundedRectangle(cornerRadius: 8))
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(row.chart.title).font(.system(size: 21, weight: .semibold)).lineLimit(2).frame(height: 50, alignment: .top)
-                    Text(row.chart.levelLabel).font(.system(size: 19, weight: .bold)).foregroundStyle(color)
-                    Text(row.record.score.formatted(.number.locale(Locale(identifier: "en_US")))).font(.system(size: 26, weight: .bold)).lineLimit(1).minimumScaleFactor(0.65)
-                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(row.chart.title).font(.system(size: 19, weight: .semibold)).lineLimit(2).frame(height: 44, alignment: .top)
+                    Text(row.chart.levelLabel).font(.system(size: 17, weight: .bold)).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.65)
+                    Text(row.record.score.formatted(.number.locale(Locale(identifier: "en_US")))).font(.system(size: 23, weight: .bold)).lineLimit(1).minimumScaleFactor(0.65)
+                }.frame(height: 94, alignment: .top)
             }
-            HStack { Text(Rating.judgeName(row.record.judge)); Spacer(); Text("\(row.record.accuracy, specifier: "%.3f")%") }.font(.system(size: 19)).foregroundStyle(color)
-            HStack { Text("rating").font(.system(size: 19)); Text(row.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 24, weight: .bold)).foregroundStyle(color).monospacedDigit() }
-        }.padding(12).frame(height: 166).frame(maxWidth: .infinity, alignment: .leading).background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 14))
+            HStack { Text(Rating.judgeName(row.record.judge)); Spacer(); Text("\(row.record.accuracy, specifier: "%.3f")%") }.font(.system(size: 16)).foregroundStyle(color)
+            HStack { Text("rating").font(.system(size: 16)); Text(row.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 20, weight: .bold)).foregroundStyle(color).monospacedDigit() }
+        }.padding(8).frame(height: 166).frame(maxWidth: .infinity, alignment: .leading).background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 14))
     }
 }
 
