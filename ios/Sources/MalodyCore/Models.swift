@@ -44,7 +44,7 @@ public struct Catalogue: Codable {
     public var byCID: [Int: Chart] { Dictionary(charts.map { ($0.cid, $0) }, uniquingKeysWith: { first, _ in first }) }
     public var promotedSongs: Set<String> { Set(charts.filter { $0.promoted || $0.path.hasPrefix("promote/") }.map(\.identity)) }
     public func revision() -> String {
-        var key = "index-v1-fixed-song-category:"
+        var key = "index-v2-zero-based-judge:"
         func part(_ value: String) { key += "\(value.utf16.count):\(value)" }
         part(server)
         for c in charts.sorted(by: { $0.cid < $1.cid }) {
@@ -73,7 +73,7 @@ public struct ScoreRecord: Codable, Identifiable, Hashable {
     public var verification = "catalog_identity"
     public var fieldMappingVerified = false
     public var uploaded = false
-    public var judge: Int { let n = rawFields["4"] ?? 0; return n.isFinite && (1...5).contains(n) && n == n.rounded() ? Int(n) : 0 }
+    public var judge: Int { let n = rawFields["4"] ?? 0; return !rawFields.isEmpty && n.isFinite && (0...4).contains(n) && n == n.rounded() ? Int(n) + 1 : 0 }
     public var valid: Bool {
         let parts = id.split(separator: ":")
         return parts.count == 3 && Int(parts[0]) == cid && Int64(parts[1]) == playedAt &&

@@ -93,7 +93,7 @@ public struct ReplayHeader {
             throw MalodyError.invalid("回放成绩数值无效")
         }
         let judgeValue = scoreFields[4]?.number ?? 0
-        let judge = judgeValue.isFinite && (1...5).contains(judgeValue) && judgeValue == judgeValue.rounded() ? Int(judgeValue) : 0
+        let judge = judgeValue.isFinite && (0...4).contains(judgeValue) && judgeValue == judgeValue.rounded() ? Int(judgeValue) + 1 : 0
         var raw: [String: Double] = [:]
         for (key, value) in scoreFields { if let number = value.number, number.isFinite { raw[String(key)] = number } }
         return ReplayHeader(hash: hash, player: String(try Wire.text(fields, 6).prefix(128)), score: score,

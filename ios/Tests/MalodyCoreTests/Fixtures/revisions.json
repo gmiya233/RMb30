@@ -15,7 +15,7 @@
         "sid": 2
       }]
     },
-    "revision": "9cb0d2c02d0a68b99e8e392ab9f6e1eb6c1e60f516a2ef2d5781fcfdcabc9158"
+    "revision": "2cc989fff109f42de266ae434460c48eb9af3642f015276064f3c5aed33fc9b6"
   },
   {
     "catalogue": {
@@ -23,7 +23,7 @@
       "charts": [{
         "mode": 7,
         "promote": false,
-        "path": "charts/曲绘/💫",
+        "path": "charts/鏇茬粯/馃挮",
         "mc_name": "1.mc",
         "level": 12.5,
         "server_hash": "hash",
@@ -33,7 +33,7 @@
         "sid": 2
       }]
     },
-    "revision": "57ae89a644063c8c9b96199dd3cf1085177ce4b164c7220f7321fc4bb7bc29b6"
+    "revision": "8031a0702a660a244e5ca364abb09848a6947e74d1ac5cd81618e8b2fead37ca"
   },
   {
     "catalogue": {
@@ -51,6 +51,6 @@
         "sid": 2
       }]
     },
-    "revision": "8067c0ed26604e113c2ec89493863d2bfa6fe1ecf5d9534e278f50170f898dfb"
+    "revision": "b57c578a0aaa10e9eaeba28c7151043ae7f69d7bd4d855bf9366c6ede01ccd34"
   }
 ]

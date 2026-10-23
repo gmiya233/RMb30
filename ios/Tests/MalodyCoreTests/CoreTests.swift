@@ -14,7 +14,7 @@ final class CoreTests: XCTestCase {
     }
     func bytes(_ field: Int, _ data: Data) -> Data { varint(UInt64(field << 3 | 2)) + varint(UInt64(data.count)) + data }
     func integer(_ field: Int, _ n: UInt64) -> Data { varint(UInt64(field << 3)) + varint(n) }
-    func replay(hash: String, accuracy: Float = 99.472244, score: UInt64 = 820594, judge: UInt64 = 1, played: UInt64 = 1792679910) -> Data {
+    func replay(hash: String, accuracy: Float = 99.472244, score: UInt64 = 820594, judge: UInt64 = 0, played: UInt64 = 1792679910) -> Data {
         var fields = integer(1, 7) + integer(4, judge) + integer(5, score) + integer(6, 2378) + integer(7, 2294) + integer(8, 84)
         fields += varint(UInt64(11 << 3 | 5))
         let bits = accuracy.bitPattern; fields += Data((0..<4).map { UInt8(truncatingIfNeeded: bits >> ($0 * 8)) })
@@ -30,6 +30,12 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(header.score, 820594); XCTAssertEqual(header.accuracy, 99.47224426269531)
         XCTAssertEqual(header.judge, 1); XCTAssertEqual(header.playedAt, 1792679910)
         XCTAssertEqual(header.player, "PLAYER"); XCTAssertEqual(header.rawFields["7"], 2294)
+        for raw in 0...4 {
+            let h = try ReplayHeader.read(replay(hash: String(repeating: "a", count: 32), judge: UInt64(raw)))
+            XCTAssertEqual(h.judge, raw + 1)
+            XCTAssertEqual(h.rawFields["4"], Double(raw))
+        }
+        XCTAssertEqual(try ReplayHeader.read(replay(hash: String(repeating: "a", count: 32), judge: 5)).judge, 0)
         XCTAssertThrowsError(try Wire.decode(Data([10, 255])))
         XCTAssertThrowsError(try Wire.decode(Data(repeating: 255, count: 11)))
         XCTAssertThrowsError(try ReplayHeader.read(replay(hash: "invalid")))
