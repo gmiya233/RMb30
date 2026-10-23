@@ -55,6 +55,7 @@ actor CloudGateway {
         return result
     }
     private func checked(_ result: [String: Any]) throws -> [String: Any] {
+        if [401, 403].contains(result["code"] as? Int ?? 0) { token = "" }
         guard (result["code"] as? Int) == 200 else { throw MalodyError.invalid("云端操作失败（服务代码 \(result["code"] as? Int ?? 0)）") }
         return result["data"] as? [String: Any] ?? [:]
     }

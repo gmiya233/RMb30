@@ -68,7 +68,10 @@ struct PosterCanvas: View {
 struct B30Page: View {
     @EnvironmentObject var model: AppModel
     @State private var image: UIImage?
-    @State private var generating = false, sharing = false, zooming = false, choosingTitle = false
+    @State private var generating = false
+    @State private var sharing = false
+    @State private var zooming = false
+    @State private var choosingTitle = false
     @State private var title = ""
     private var signature: String { (model.board.old + model.board.new).map(\.record.id).joined() + model.playerName + model.playerTitle }
     var body: some View {

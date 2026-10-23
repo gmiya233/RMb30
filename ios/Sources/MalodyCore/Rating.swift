@@ -44,6 +44,9 @@ public struct RatedScore: Identifiable {
     public let rating: Double
     public let isNew: Bool
     public var id: String { record.id }
+    public init(chart: Chart, record: ScoreRecord, rating: Double, isNew: Bool) {
+        self.chart = chart; self.record = record; self.rating = rating; self.isNew = isNew
+    }
     public static func better(_ lhs: RatedScore, _ rhs: RatedScore) -> Bool {
         if lhs.rating != rhs.rating { return lhs.rating > rhs.rating }
         if lhs.record.accuracy != rhs.record.accuracy { return lhs.record.accuracy > rhs.record.accuracy }

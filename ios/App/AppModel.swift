@@ -89,7 +89,7 @@ import MalodyCore
                 let root = try DirectoryBookmark.resolve(); await refreshIfNeeded()
                 let previous = state, profile = qq, currentCatalogue = catalogue
                 let output = try await importer.scan(root: root, catalogue: currentCatalogue, previous: previous) { [weak self] text in
-                    await MainActor.run { self?.status = text }
+                    await self?.setProgress(text)
                 }
                 try Task.checkCancellation()
                 try await store.save(output.state, qq: profile)
@@ -98,6 +98,7 @@ import MalodyCore
             catch { self.error = error.localizedDescription; status = "读取未完成，原成绩保留；可重新选择文件夹后再试" }
         }
     }
+    private func setProgress(_ text: String) { status = text }
     func cancel() { task?.cancel() }
     func updateCatalogue() {
         guard !busy, ready else { return }; busy = true
@@ -136,7 +137,7 @@ import MalodyCore
             do {
                 await refreshIfNeeded(); let profile = qq
                 let merged = try await cloud.sync(qq: profile, records: state.records, catalogue: catalogue, upload: upload) { [weak self] text in
-                    await MainActor.run { self?.status = text }
+                    await self?.setProgress(text)
                 }
                 try Task.checkCancellation(); var next = state; next.records = merged
                 try await store.save(next, qq: profile); state = next; rebuild()

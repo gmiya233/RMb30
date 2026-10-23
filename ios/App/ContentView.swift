@@ -204,14 +204,24 @@ struct RankingPage: View {
 
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: items, applicationActivities: nil) }
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let presenter = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap(\.windows).first(where: \.isKeyWindow)?.rootViewController?.view {
+            controller.popoverPresentationController?.sourceView = presenter
+            controller.popoverPresentationController?.sourceRect = CGRect(x: presenter.bounds.midX, y: presenter.bounds.midY, width: 1, height: 1)
+            controller.popoverPresentationController?.permittedArrowDirections = []
+        }
+        return controller
+    }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 struct SettingsPage: View {
     @EnvironmentObject var model: AppModel
     @State private var chooseFolder = false
-    @State private var qqDraft = "", nameDraft = "", selectedTitle = ""
+    @State private var qqDraft = ""
+    @State private var nameDraft = ""
+    @State private var selectedTitle = ""
     @State private var diagnostic: URL?
     @State private var share = false
     var body: some View {
