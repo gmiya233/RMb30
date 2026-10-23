@@ -36,3 +36,5 @@ ios/Resources/reader-config.json
 ios/Resources/build-info.json
 *.xcuserstate
 *.ipa
+ios/App/Info.plist
+ios/App/Assets.xcassets/
