@@ -1,0 +1,45 @@
+name: iOS self-sign test package
+on:
+  push:
+    branches: [codex/ios-file-sync]
+    paths: ['ios/**', 'tools/prepare_ios_resources.py', '.github/workflows/ios-test.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test shared Swift core
+        run: swift test --package-path ios
+      - name: Prepare app resources
+        if: hashFiles('ios/project.yml') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/ios-resources
+          gh release download v1.5.2 --repo gmiya233/RMb30 --pattern '*.APK' --dir build/ios-resources
+          python3 tools/prepare_ios_resources.py --apk build/ios-resources/*.APK
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          cd ios && xcodegen generate
+      - name: Build arm64 device app without signing
+        if: hashFiles('ios/project.yml') != ''
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/ios-device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build | tee build/ios-build.log
+          python3 tools/package_ios.py build/ios-device/Build/Products/Release-iphoneos/MalodyLink.app
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: hashFiles('dist/*.ipa') != ''
+        with:
+          name: Malody-Link-iOS-self-sign-test
+          path: |
+            dist/*.ipa
+            dist/*.sha256
+          retention-days: 14

@@ -1,0 +1,56 @@
+[
+  {
+    "catalogue": {
+      "server": "https://fixture.invalid",
+      "charts": [{
+        "mode": 7,
+        "promote": 1,
+        "path": "promote/_song_2/0",
+        "mc_name": "1.mc",
+        "level": 13,
+        "server_hash": "hash",
+        "title": "Fixture",
+        "version": "SC10 LV.13",
+        "cid": 1,
+        "sid": 2
+      }]
+    },
+    "revision": "9cb0d2c02d0a68b99e8e392ab9f6e1eb6c1e60f516a2ef2d5781fcfdcabc9158"
+  },
+  {
+    "catalogue": {
+      "server": "https://fixture.invalid",
+      "charts": [{
+        "mode": 7,
+        "promote": false,
+        "path": "charts/曲绘/💫",
+        "mc_name": "1.mc",
+        "level": 12.5,
+        "server_hash": "hash",
+        "title": "Fixture",
+        "version": "LV.12.5",
+        "cid": 1,
+        "sid": 2
+      }]
+    },
+    "revision": "57ae89a644063c8c9b96199dd3cf1085177ce4b164c7220f7321fc4bb7bc29b6"
+  },
+  {
+    "catalogue": {
+      "server": "https://fixture.invalid",
+      "charts": [{
+        "mode": 7,
+        "promote": true,
+        "path": "charts/slash\"quote",
+        "mc_name": "1.mc",
+        "level": null,
+        "server_hash": "hash",
+        "title": "Fixture",
+        "version": "SC9.5",
+        "cid": 1,
+        "sid": 2
+      }]
+    },
+    "revision": "8067c0ed26604e113c2ec89493863d2bfa6fe1ecf5d9534e278f50170f898dfb"
+  }
+]
