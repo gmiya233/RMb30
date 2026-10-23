@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh QQ bot public song catalogue
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=10
+Unit=malody-qqbot-catalog.service
+
+[Install]
+WantedBy=timers.target

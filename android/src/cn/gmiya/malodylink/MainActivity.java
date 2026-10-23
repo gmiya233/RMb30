@@ -80,7 +80,7 @@ public final class MainActivity extends Activity {
     }
     private void pairingEntry(){
         LinearLayout card=AppUi.column(this,16);GradientDrawable background=shape(AppUi.SELECTED,18);background.setStroke(dp(1),GREEN);card.setBackground(background);
-        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);LinearLayout copy=AppUi.column(this,0);copy.addView(text("首次使用，先完成配对",18,GREEN,true));copy.addView(text("只需首次连接时设置，之后一键同步成绩。",13,MUTED,false));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);LinearLayout copy=AppUi.column(this,0);copy.addView(text("首次使用，先完成连接设置",18,GREEN,true));copy.addView(text("先开启开发者模式，再开启无线调试并配对。",13,MUTED,false));row.addView(copy,new LinearLayout.LayoutParams(0,-2,1));
         Button pair=AppUi.button(this,"首次配对 →",()->startActivityForResult(new Intent(this,InternalReaderActivity.class),12));pair.setTextColor(AppUi.ON_SUCCESS);pair.setBackgroundTintList(ColorStateList.valueOf(GREEN));pair.setPadding(dp(14),dp(6),dp(14),dp(6));LinearLayout.LayoutParams action=new LinearLayout.LayoutParams(-2,-2);action.leftMargin=dp(12);row.addView(pair,action);card.addView(row);
         LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(-1,-2);size.bottomMargin=dp(12);root.addView(card,size);
     }
@@ -161,12 +161,12 @@ public final class MainActivity extends Activity {
             button(cloud,"合并同步云端（上传＋拉取）",true,()->startCloud(true));button(cloud,"只从云端拉取",false,()->startCloud(false));
         }
         cloud.addView(text("QQ号仅作存档编号，暂不验证归属。不同QQ的本地存档分别保存。",12,MUTED,false));
-        LinearLayout reader=settingsCard(columns[0]);reader.addView(text("读取与筛选",18,INK,true));space(reader,4);reader.addView(text("首次按引导配对；之后点一次同步即可。默认账号自动更新谱库，无需手填账号。",14,MUTED,false));
+        LinearLayout reader=settingsCard(columns[0]);reader.addView(text("读取与筛选",18,INK,true));space(reader,4);reader.addView(text("首次依次开启开发者模式、无线调试，再按引导配对；之后点一次同步即可。默认账号自动更新谱库，无需手填账号。",14,MUTED,false));
         button(reader,"同步本机成绩",true,()->startActivityForResult(new Intent(this,InternalReaderActivity.class).putExtra("sync_now",true),12));
 
         LinearLayout server=settingsCard(columns[1]);server.addView(text("我的谱面服务器",18,INK,true));server.addView(text(engine.server,13,MUTED,false));
         long updated=engine.catalog.optLong("updated_at");server.addView(text("清单更新："+date(updated),12,MUTED,false));
-        button(server,"更新谱库（默认账号）",false,()->runTask(()->DefaultCatalog.refresh(this,engine,true,this::message)));button(server,"其他服务器 / 账号",false,this::login);button(server,"导出匹配成绩 JSON",false,()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"malody-link-scores.json");startActivityForResult(i,11);});
+        button(server,"更新谱库（默认账号）",false,()->runTask(()->DefaultCatalog.refresh(this,engine,true,this::message)));button(server,"导出匹配成绩 JSON",false,()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"malody-link-scores.json");startActivityForResult(i,11);});
 
         LinearLayout about=settingsCard(columns[0]);about.addView(text("关于 Malody Link",18,INK,true));space(about,8);about.addView(text(appVersion()+" · O20 + N10\n仅收录当前服务器谱库成绩；预览参数不改写原始记录。",13,MUTED,false));button(about,"获取更新",false,()->startActivity(new Intent(this,UpdateActivity.class)));
         space(root,8);root.addView(text("QQ机器人尚未接入；成绩数值字段仍待核对。",12,MUTED,false));

@@ -11,6 +11,12 @@ import java.util.regex.*;
 public final class CloudRecords {
     public static final int MAX_RECORDS=20000,MAX_BATCH=256,MAX_BYTES=1048576;
     private static final Pattern ID=Pattern.compile("([1-9][0-9]*):([0-9]+):[a-f0-9]{32}");
+    public static int judge(JSONObject score){
+        JSONObject raw=score.optJSONObject("raw_score_fields");if(raw==null||raw.length()==0)return 0;
+        // Protobuf omits the zero-valued A enum. Preserve raw fields without rewriting them.
+        if(!raw.has("4"))return RatingRules.replayJudge(0);
+        Object value=raw.opt("4");return value instanceof Number?RatingRules.replayJudge(((Number)value).doubleValue()):0;
+    }
     public static String qq(String value){String s=value==null?"":value.trim();if(!s.matches("[1-9][0-9]{4,11}"))throw new IllegalArgumentException("QQ号请填写5～12位数字，不能以0开头");return s;}
     public static String sha256(byte[] bytes)throws Exception {StringBuilder s=new StringBuilder();for(byte b:MessageDigest.getInstance("SHA-256").digest(bytes)){s.append(Character.forDigit((b>>>4)&15,16));s.append(Character.forDigit(b&15,16));}return s.toString();}
     public static byte[] read(InputStream input,int max)throws IOException {try(InputStream in=input;ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[16384];int n;while((n=in.read(b))!=-1){if(out.size()+n>max)throw new IOException("云端数据超过读取上限");out.write(b,0,n);}return out.toByteArray();}}

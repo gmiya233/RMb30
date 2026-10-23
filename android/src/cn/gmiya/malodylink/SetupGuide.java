@@ -4,8 +4,8 @@ package cn.gmiya.malodylink;
 public final class SetupGuide {
     public static final int DEVELOPER=0,WIRELESS=1,PAIR=2,READY=3;
     public static int stage(boolean unlocked,boolean master,boolean wireless,boolean paired){
-        if(!unlocked)return DEVELOPER;
-        if(!master||!wireless)return WIRELESS;
+        if(!unlocked||!master)return DEVELOPER;
+        if(!wireless)return WIRELESS;
         return paired?READY:PAIR;
     }
 }

@@ -1,0 +1,35 @@
+[Unit]
+Description=Malody QQ official leaderboard bot
+Wants=network-online.target
+After=network-online.target malody-ranking.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=malody-qqbot
+WorkingDirectory=/opt/malody-qqbot
+ExecStart=/opt/malody-qqbot/venv/bin/python -B /opt/malody-qqbot/bot.py
+LoadCredential=appsecret:/etc/malody-qqbot/appsecret
+LoadCredential=config:/etc/malody-qqbot/config.json
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=30
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=tmpfs
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -13,7 +13,7 @@ import java.util.concurrent.*;
 
 public final class InternalReaderActivity extends Activity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
-    private TextView status,summary,pairHint,developerHint;private LinearLayout advanced,developerStep,wirelessStep,pairStep,readyStep;private Button recover,pairButton,developerButton,syncButton;
+    private TextView status,summary,pairHint,developerHint,developerTitle;private LinearLayout advanced,developerStep,wirelessStep,pairStep,readyStep;private Button recover,pairButton,developerButton,syncButton;
     private boolean wirelessConfirmed;
     private boolean busy,retryOnResume;private long openedAt;private boolean receiverRegistered;
     private AlertDialog developerReturnDialog;
@@ -33,14 +33,16 @@ public final class InternalReaderActivity extends Activity {
         root.addView(label("本机成绩同步",26,INK));summary=label("",16,MUTED);root.addView(summary);
         boolean paired=getSharedPreferences("reader",0).getBoolean("paired",false);
         developerStep=section(root);
-        developerStep.addView(label("首次设置 · 开启开发者模式",20,INK));
+        developerTitle=label("第1步 · 开启开发者模式",20,INK);developerStep.addView(developerTitle);
         developerHint=label("进入关于手机 → 版本信息，连续点 7 次版本号。看到已开启的提示后，返回本App继续。",16,MUTED);developerStep.addView(developerHint);
         developerButton=button(developerStep,"前往关于手机",this::deviceInfoSettings);
         wirelessStep=section(root);
-        wirelessStep.addView(label("开启无线调试",20,INK));
+        wirelessStep.addView(label("第2步 · 开启无线调试",20,INK));
+        wirelessStep.addView(label("无线调试在「开发者选项」里面。需先开启开发者模式及页面顶部总开关，才能开启无线调试。",16,MUTED));
         wirelessStep.addView(label("先打开右侧开关，再直接点「无线调试」文字或整行空白区域进入详情。右侧开关只负责开启，不是进入按钮。",16,MUTED));
         wirelessStep.addView(new ConnectionGuideView(this,1),new LinearLayout.LayoutParams(-1,-2));
         button(wirelessStep,"前往无线调试",this::settings);
+        button(wirelessStep,"找不到开发者选项？",this::showDeveloperInstructions);
         button(wirelessStep,"已开启，继续",()->{wirelessConfirmed=true;refresh();});
         pairStep=section(root);
         pairStep.addView(label("最后一步 · 完成系统配对",20,INK));
@@ -85,10 +87,17 @@ public final class InternalReaderActivity extends Activity {
         wirelessStep.setVisibility(stage==SetupGuide.WIRELESS?View.VISIBLE:View.GONE);
         pairStep.setVisibility(stage==SetupGuide.PAIR?View.VISIBLE:View.GONE);
         readyStep.setVisibility(stage==SetupGuide.READY?View.VISIBLE:View.GONE);
-        summary.setText(stage==SetupGuide.READY?"已保留配对记录，无需重复设置。":stage==SetupGuide.PAIR?"仅首次需要系统授权。配对成功后自动导入。":stage==SetupGuide.WIRELESS?"完成这一步后返回，App会继续下一步。":"首次需要一次系统授权，之后点一次同步即可。");
+        summary.setText(stage==SetupGuide.READY?"已保留配对记录，无需重复设置。":stage==SetupGuide.PAIR?"开发者模式、无线调试已就绪，完成配对后自动导入。":stage==SetupGuide.WIRELESS?"开发者模式已开启。接下来开启无线调试，完成后返回本App。":"首次配置顺序：开启开发者模式 → 开启无线调试 → 完成配对。请先完成第1步。");
+    }
+    private void renderDeveloperState(boolean unlocked){
+        developerTitle.setText(unlocked?"第1步 · 开启开发者选项总开关":"第1步 · 开启开发者模式");
+        developerHint.setText(unlocked?"开发者选项入口已解锁，无需再点7次版本号。请进入开发者选项，开启页面顶部的总开关，然后返回本App继续。":"首次使用必须先开启开发者模式，否则无法开启无线调试。进入关于手机 → 版本信息，连续点7次「软件版本号」或「版本号」，按系统提示验证锁屏密码。看到已开启的提示后，返回本App继续。");
+        developerButton.setText(unlocked?"进入开发者选项":"前往关于手机，开启开发者模式");
     }
     private void refresh(){if(status==null||isDestroyed())return;android.content.SharedPreferences p=getSharedPreferences("reader",0);boolean paired=p.getBoolean("paired",false);
-        int stage=SetupGuide.stage(!developerDisabled(),DeveloperModeState.masterEnabled(this),wirelessEnabled(),paired);
+        boolean unlocked=!developerDisabled(),master=DeveloperModeState.masterEnabled(this);
+        renderDeveloperState(unlocked);
+        int stage=SetupGuide.stage(unlocked,master,wirelessEnabled(),paired);
         displayStage(stage);
         boolean syncing=busy||LocalScoreSync.isBusy()||LocalSyncService.active;
         syncButton.setEnabled(!syncing);pairButton.setEnabled(!syncing);
@@ -120,7 +129,10 @@ public final class InternalReaderActivity extends Activity {
     private boolean developerDisabled(){return !DeveloperModeState.unlocked(this);}
     private void deviceInfoSettings(){
         if(!developerDisabled()){developerSettings();return;}
-        new AlertDialog.Builder(this).setTitle("开启后，请返回本App").setMessage("进入关于手机 → 版本信息，连续点 7 次「软件版本号」或「版本号」。看到系统提示已开启后，请按返回或切回 Malody Link，再点「进入开发者选项」。此操作仅首次需要。").setNegativeButton("取消",null).setPositiveButton("前往版本信息",(d,w)->{
+        showDeveloperInstructions();
+    }
+    private void showDeveloperInstructions(){
+        new AlertDialog.Builder(this).setTitle("先开启开发者模式").setMessage("进入关于手机 → 版本信息，连续点7次「软件版本号」或「版本号」，按系统提示验证锁屏密码。看到已开启的提示后，请按返回或切回 Malody Link，再点「进入开发者选项」，开启页面顶部总开关。此操作仅首次需要；不同手机的版本号入口名称可能不同。").setNegativeButton("取消",null).setPositiveButton("前往版本信息",(d,w)->{
             getSharedPreferences("reader",0).edit().putBoolean("developer_guide_pending",true).apply();showDeveloperReturnNotice();
             status.setText("看到系统开启提示后，请返回本App，再进入开发者选项。");
             try{startActivity(new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS));}catch(Exception unavailable){try{startActivity(new Intent(Settings.ACTION_SETTINGS));}catch(Exception e){status.setText("请手动打开系统设置 → 关于手机 → 版本信息，完成后返回本App。");}}
@@ -135,7 +147,7 @@ public final class InternalReaderActivity extends Activity {
     }
     private void developerSettings(){
         if(developerDisabled()){deviceInfoSettings();return;}
-        try{startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).putExtra(":settings:fragment_args_key","toggle_adb_wireless"));status.setText("直接点「无线调试」文字或整行空白处进入详情，右侧开关只负责开启。然后点「使用配对码配对设备」，保持弹窗打开，在通知中输入六位码。");}
+        try{startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).putExtra(":settings:fragment_args_key","toggle_adb_wireless"));status.setText(DeveloperModeState.masterEnabled(this)?"直接点「无线调试」文字或整行空白处进入详情，右侧开关只负责开启。然后点「使用配对码配对设备」，保持弹窗打开，在通知中输入六位码。":"请先开启开发者选项页面顶部的总开关，完成后返回本App继续。");}
         catch(Exception unavailable){try{startActivity(new Intent(Settings.ACTION_SETTINGS));status.setText("请进入系统设置，搜索「无线调试」；若没有结果，需先开启开发者选项。");}catch(Exception e){status.setText("无法启动系统设置，请从手机设置进入开发者选项 → 无线调试。");}}
     }
 

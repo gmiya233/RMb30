@@ -1,6 +1,12 @@
 # Server-aggregated leaderboards
 
 The daemon reads original `scores-*.json` archives and writes derived v2 boards.
+Replay score field 4 is the zero-based Malody `JudgeLevel` enum (A=0 through
+E=4). Convert it once to the app's 1-based A–E indices for display and rating;
+keep the original field untouched in archives. A missing protobuf enum field
+defaults to A when other raw score fields are present; empty/invalid raw payloads
+remain unknown. Rating namespaces use `index-v2-zero-based-judge:` so snapshots
+calculated with the old off-by-one interpretation cannot mix with corrected ones.
 It uses the same Java catalogue validation, rating, song grouping and tie rules
 as the Android client. Original history files and legacy v1 indices are read-only
 to this process. Normal client uploads continue to maintain v1 indices.

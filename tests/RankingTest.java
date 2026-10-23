@@ -8,9 +8,18 @@ public final class RankingTest {
     static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);checks++;}
     static boolean near(double a,double b){return Math.abs(a-b)<1e-9;}
     static JSONObject chart(int cid,int sid,int level,boolean promote){return new JSONObject().put("cid",cid).put("sid",sid).put("level",level).put("server_hash","hash"+cid).put("title","Song "+sid).put("artist","Artist").put("bpm",180).put("creator","Mapper").put("version","Lv."+level).put("promote",promote);}
-    static JSONObject score(int cid,int seed,double accuracy,int judge,int value){String hash=String.format(Locale.ROOT,"%032x",seed);return new JSONObject().put("id",cid+":"+(1700000000L+seed)+":"+hash).put("cid",cid).put("server_hash","hash"+cid).put("chart_md5",hash).put("played_at",1700000000L+seed).put("score_candidate",value).put("accuracy_candidate",accuracy).put("player","Fixture").put("raw_score_fields",new JSONObject().put("4",judge));}
+    static JSONObject score(int cid,int seed,double accuracy,int judge,int value){String hash=String.format(Locale.ROOT,"%032x",seed);return new JSONObject().put("id",cid+":"+(1700000000L+seed)+":"+hash).put("cid",cid).put("server_hash","hash"+cid).put("chart_md5",hash).put("played_at",1700000000L+seed).put("score_candidate",value).put("accuracy_candidate",accuracy).put("player","Fixture").put("raw_score_fields",new JSONObject().put("4",judge-1));}
     public static void main(String[] args)throws Exception {
         JSONArray charts=new JSONArray().put(chart(1,1,12,false)).put(chart(2,1,13,true)).put(chart(3,2,14,false));
+        for(int raw=0;raw<=4;raw++){
+            JSONObject sample=score(1,100+raw,99.5,raw+1,100);
+            check(CloudRecords.judge(sample)==raw+1,"zero-based replay judge "+raw);
+            RankingData.Player one=RankingData.player("123456",new JSONArray().put(sample),charts);
+            check(near(one.best.get(1).rating,12*RatingRules.PRESET[raw+1]),"judge multiplier matches replay enum "+raw);
+        }
+        JSONObject omitted=score(1,200,99.5,1,100);omitted.getJSONObject("raw_score_fields").remove("4");omitted.getJSONObject("raw_score_fields").put("5",100);
+        check(CloudRecords.judge(omitted)==1,"omitted protobuf zero enum means A");
+        check(RatingRules.replayJudge(5)==0&&RatingRules.replayJudge(1.5)==0,"invalid and MAX enum excluded");
         SongCatalogue catalogue=new SongCatalogue(charts);
         check(catalogue.songs.size()==2&&catalogue.forChart(1)==catalogue.forChart(2),"group SID with separate chart difficulties");
         check(catalogue.search("ＡＲＴＩＳＴ mapper").size()==2,"NFKC case insensitive artist and mapper keywords");

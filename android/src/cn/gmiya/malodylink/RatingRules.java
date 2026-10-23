@@ -10,6 +10,8 @@ public final class RatingRules {
         multipliers=values.clone();for(int i=1;i<=5;i++)if(!Double.isFinite(values[i])||values[i]<=0||values[i]>10)throw new IllegalArgumentException("倍率必须在 0～10 之间");
     }
     public static String judgeName(int judge){return judge>=1&&judge<=5?"ABCDE".substring(judge-1,judge)+"判":"判定待核对";}
+    /** Malody serializes JudgeLevel as A=0..E=4; UI/rating indices stay 1..5. */
+    public static int replayJudge(double raw){return Double.isFinite(raw)&&raw>=0&&raw<=4&&raw==Math.rint(raw)?(int)raw+1:0;}
     public static double accuracyFactor(double accuracy){
         if(!Double.isFinite(accuracy)||accuracy<0||accuracy>100)throw new IllegalArgumentException("准度应在 0～100% 之间");
         if(accuracy>=99.8)return 1.01;

@@ -23,7 +23,7 @@ public final class PosterData extends RatingBoard {
         }else{
             for(int i=0;i<engine.scores.length();i++){JSONObject s=engine.scores.getJSONObject(i);if(!engine.active(s.optInt("cid"),s.optString("server_hash")))continue;JSONObject c=all.get(s.getInt("cid"));if(c==null)continue;
                 Entry e=from(c);e.player=s.optString("player","PLAYER");e.score=s.optLong("score_candidate");e.accuracy=s.optDouble("accuracy_candidate");
-                JSONObject raw=s.optJSONObject("raw_score_fields");e.judge=raw!=null?raw.optInt("4",0):0;if(e.judge<1||e.judge>5)e.judge=0;
+                e.judge=CloudRecords.judge(s);
                 String saved=preview?prefs.getString("entry_"+e.cid,""):"";if(!saved.isEmpty()){JSONObject override=new JSONObject(saved);e.level=override.optDouble("level",e.level);e.accuracy=override.optDouble("accuracy",e.accuracy);e.judge=override.optInt("judge",e.judge);e.manual=true;e.levelOverride=override.has("level");}
                 if(judgeOverride>0){e.judge=judgeOverride;e.manual=true;}e.converted=rules.rating(e.level,e.difficultyVersion,e.accuracy,e.judge);if(e.levelOverride)e.converted=rules.converted(e.level,e.accuracy,e.judge);entries.add(e);
             }

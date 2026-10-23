@@ -13,7 +13,7 @@ public final class RecentPlays {
         for(int i=0;i<scores.length();i++){
             JSONObject s=scores.optJSONObject(i);if(s==null)continue;JSONObject c=catalogue.get(s.optInt("cid"));
             if(c==null||!c.optString("server_hash").equals(s.optString("server_hash")))continue;
-            Play p=new Play();p.record=s;p.chart=c;JSONObject fields=s.optJSONObject("raw_score_fields");p.judge=fields==null?0:fields.optInt("4");
+            Play p=new Play();p.record=s;p.chart=c;p.judge=CloudRecords.judge(s);
             p.level=ChartDetails.level(SongCatalogue.rawLevel(c),c.optString("version"));
             try{p.rating=rules.rating(SongCatalogue.rawLevel(c),c.optString("version"),s.optDouble("accuracy_candidate"),p.judge);}catch(IllegalArgumentException invalid){p.rating=Double.NaN;}
             rows.add(p);

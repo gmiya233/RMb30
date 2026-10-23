@@ -1,0 +1,12 @@
+[Unit]
+Description=Publish public song catalogue for Malody QQ bot
+
+[Service]
+Type=oneshot
+ExecStart=/opt/malody-qqbot/venv/bin/python -B /opt/malody-qqbot/publish_catalogue.py
+ProtectSystem=strict
+ReadWritePaths=/var/lib/malody-qqbot-catalog
+ProtectHome=yes
+PrivateNetwork=yes
+PrivateTmp=yes
+NoNewPrivileges=yes

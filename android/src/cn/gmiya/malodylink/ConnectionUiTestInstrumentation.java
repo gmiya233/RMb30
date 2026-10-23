@@ -24,6 +24,13 @@ public final class ConnectionUiTestInstrumentation extends Instrumentation {
             Method display=InternalReaderActivity.class.getDeclaredMethod("displayStage",int.class);display.setAccessible(true);
             Method refresh=InternalReaderActivity.class.getDeclaredMethod("refresh");refresh.setAccessible(true);
             runOnMainSync(()->{try{
+                Method developer=InternalReaderActivity.class.getDeclaredMethod("renderDeveloperState",boolean.class);developer.setAccessible(true);
+                developer.invoke(page,false);
+                check(((TextView)field(page,"developerHint")).getText().toString().contains("首次使用必须先开启开发者模式"),"new player sees developer prerequisite");
+                check(((Button)field(page,"developerButton")).getText().toString().contains("关于手机"),"locked device opens version information");
+                developer.invoke(page,true);
+                check(((Button)field(page,"developerButton")).getText().toString().equals("进入开发者选项"),"unlocked device skips tapping version again");
+                check(((TextView)field(page,"developerHint")).getText().toString().contains("顶部的总开关"),"master switch explained before wireless debugging");
                 for(int stage=0;stage<4;stage++){
                     display.invoke(page,stage);String[] names={"developerStep","wirelessStep","pairStep","readyStep"};
                     for(int i=0;i<names.length;i++)check(((View)field(page,names[i])).getVisibility()==(i==stage?View.VISIBLE:View.GONE),"one setup stage at a time");
