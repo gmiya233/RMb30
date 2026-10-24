@@ -34,7 +34,7 @@ struct RootView: View {
                         .buttonStyle(.plain).accessibilityLabel(tabs[index].0).accessibilityAddTraits(model.selectedTab == index ? .isSelected : [])
                     }
                 }.padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: 850)
-            }.frame(maxWidth: .infinity).background(.regularMaterial)
+            }.frame(maxWidth: .infinity).background(.regularMaterial).dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
         .alert("操作未完成", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("知道了", role: .cancel) { model.error = nil }
