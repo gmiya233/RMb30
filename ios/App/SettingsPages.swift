@@ -120,10 +120,20 @@ struct RatingPreviewControls: View {
                     if entryJudge > 0 { model.preview.judges[id] = entryJudge } else { model.preview.judges.removeValue(forKey: id) }
                     model.showingPreview = true; notice = "已应用，模拟卡片以 * 标记"
                 }.frame(minHeight: 44)
+                Button("恢复该谱面原始参数") {
+                    if let id = Int(cid) { model.preview.levels.removeValue(forKey: id); model.preview.accuracies.removeValue(forKey: id); model.preview.judges.removeValue(forKey: id); level = ""; accuracy = ""; entryJudge = 0; notice = "该谱面已恢复原始参数" }
+                }.frame(minHeight: 44)
                 if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(Palette.accent) }
                 Button("恢复默认") { model.preview = RatingPreview(); model.showingPreview = false }.frame(minHeight: 44)
                 Text("rating = 折算等级 × 准度系数 × 判定倍率。99.8%以上系数为1.01；99.5%以下为(准度/99.5)²。全图判定优先于单曲判定。模拟不改变真实成绩、称号和上传数据。").font(.caption).foregroundStyle(.secondary)
             }.padding(.vertical, 10)
         }.padding(16).background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
+        .onChange(of: cid) { value in
+            guard let id = Int(value), let chart = model.catalogue.byCID[id] else { return }
+            let record = (model.board.old + model.board.new).first(where: { $0.chart.cid == id })?.record ?? model.state.records.filter { $0.cid == id }.max(by: { $0.playedAt < $1.playedAt })
+            level = (model.preview.levels[id] ?? chart.rawLevel).map { Rating.formatLevel($0) } ?? ""
+            accuracy = (model.preview.accuracies[id] ?? record?.accuracy).map { String($0) } ?? ""
+            entryJudge = model.preview.judges[id] ?? 0; notice = ""
+        }
     }
 }

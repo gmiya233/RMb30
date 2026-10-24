@@ -76,7 +76,11 @@ struct B30Page: View {
     @State private var demo = false
     private var displayedBoard: ScoreBoard { demo ? ExamplePoster.board(model.catalogue) : model.previewBoard }
     @State private var title = ""
-    private var signature: String { String(demo) + (model.previewBoard.old + model.previewBoard.new).map(\.record.id).joined() + model.playerName + model.playerTitle + String(describing: model.preview) + String(model.showingPreview) + String(model.state.avatar?.hashValue ?? 0) }
+    private var signature: String {
+        let rows = model.previewBoard.old + model.previewBoard.new
+        let identity = rows.map { $0.record.id + $0.chart.title + $0.chart.levelLabel + $0.chart.keysLabel + String($0.rating) }.joined()
+        return String(demo) + identity + model.playerName + model.playerTitle + String(describing: model.preview) + String(model.showingPreview) + String(model.state.avatar?.hashValue ?? 0)
+    }
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
@@ -134,7 +138,11 @@ struct ZoomImage: UIViewRepresentable {
 struct HomePosterThumbnail: View {
     @EnvironmentObject var model: AppModel
     @State private var image: UIImage?
-    private var signature: String { (model.board.old + model.board.new).map(\.record.id).joined() + model.playerName + model.playerTitle + String(model.state.avatar?.hashValue ?? 0) }
+    private var signature: String {
+        let rows = model.board.old + model.board.new
+        let identity = rows.map { $0.record.id + $0.chart.title + $0.chart.levelLabel + $0.chart.keysLabel + String($0.rating) }.joined()
+        return identity + model.playerName + model.playerTitle + String(model.state.avatar?.hashValue ?? 0)
+    }
     var body: some View {
         Button { model.selectedTab = 1 } label: {
             Group { if let image { Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 420) } else { ProgressView("生成成绩缩略图…").frame(height: 180) } }.frame(maxWidth: .infinity)
