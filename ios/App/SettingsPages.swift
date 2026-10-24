@@ -82,7 +82,10 @@ struct SettingsPage: View {
             let bytes = try await HTTPBytes.request(url, limit: 2_000_000)
             guard let releases = try JSONSerialization.jsonObject(with: bytes) as? [[String: Any]], let release = releases.first(where: { ($0["tag_name"] as? String ?? "").hasPrefix("ios-v") && $0["draft"] as? Bool != true }),
                   let link = release["html_url"] as? String, let target = URL(string: link), target.scheme == "https", target.host == "github.com", target.path.hasPrefix("/gmiya233/RMb30/releases/") else { throw MalodyError.invalid("尚无可用的 iOS 发布包") }
-            updateStatus = "最新发布：" + (release["tag_name"] as? String ?? "") + "，请在发布页下载并自行签名。"
+            let tag = release["tag_name"] as? String ?? ""
+            let latest = String(tag.dropFirst(5)), current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2.0"
+            guard latest.compare(current, options: .numeric) == .orderedDescending else { updateStatus = "当前版本 " + current + " 已是最新；最新公开发布为 " + latest; return }
+            updateStatus = "最新发布：" + tag + "，请在发布页下载并自行签名。"
             openURL(target)
         } catch { updateStatus = "检查更新失败：" + error.localizedDescription }
     }
