@@ -2,7 +2,7 @@ name: iOS self-sign test package
 on:
   push:
     branches: [main, codex/ios-file-sync, codex/ios-android-parity]
-    paths: ['ios/**', 'tools/prepare_ios_resources.py', '.github/workflows/ios-test.yml']
+    paths: ['ios/**', 'tools/prepare_ios_resources.py', 'tools/normalize_ios_images.swift', '.github/workflows/ios-test.yml']
   workflow_dispatch:
     inputs:
       startup_only:
@@ -36,6 +36,7 @@ jobs:
           mkdir -p build/ios-resources
           gh release download v1.5.3 --repo gmiya233/RMb30 --pattern '*.APK' --dir build/ios-resources
           python3 tools/prepare_ios_resources.py --apk build/ios-resources/*.APK
+          swift tools/normalize_ios_images.swift ios/Resources
           swift tools/create_ios_icon.swift ios/App/Assets.xcassets/AppIcon.appiconset
           brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
           cd ios && xcodegen generate

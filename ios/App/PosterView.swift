@@ -50,7 +50,7 @@ struct PosterCanvas: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .top, spacing: 10) {
                 ZStack(alignment: .topLeading) {
-                    if let image = UIImage(contentsOfFile: LocalPaths.jacket(row.chart).path) { Image(uiImage: image).resizable().scaledToFill().frame(width: 80, height: 94).clipped() }
+                    if let image = UIImage(contentsOfFile: LocalPaths.jacket(row.chart).path) { Image(bitmap: image).resizable().scaledToFill().frame(width: 80, height: 94).clipped() }
                     else { Image(systemName: "music.note").resizable().scaledToFit().padding(22).frame(width: 80, height: 94).background(Palette.selected).foregroundStyle(color) }
                     Text(String(format: "%02d", index)).font(.system(size: 15, weight: .bold)).padding(3).background(color).foregroundStyle(.white)
                 }.clipShape(RoundedRectangle(cornerRadius: 8))
@@ -97,7 +97,7 @@ struct B30Page: View {
                     Spacer()
                     if generating { ProgressView().accessibilityLabel("正在生成成绩图") }
                 }
-                if let image { Image(uiImage: image).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 14)).onTapGesture { zooming = true }.accessibilityLabel("O20 加 N10 成绩图") }
+                if let image { Image(bitmap: image).resizable().scaledToFit().clipShape(RoundedRectangle(cornerRadius: 14)).onTapGesture { zooming = true }.accessibilityLabel("O20 加 N10 成绩图") }
                 else { ProgressView("正在生成成绩图…").frame(minHeight: 300) }
             }.padding(18).frame(maxWidth: 900).frame(maxWidth: .infinity)
         }.navigationTitle("我的 B30")
@@ -145,7 +145,7 @@ struct HomePosterThumbnail: View {
     }
     var body: some View {
         Button { model.selectedTab = 1 } label: {
-            Group { if let image { Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 420) } else { ProgressView("生成成绩缩略图…").frame(height: 180) } }.frame(maxWidth: .infinity)
+            Group { if let image { Image(bitmap: image).resizable().scaledToFit().frame(maxHeight: 420) } else { ProgressView("生成成绩缩略图…").frame(height: 180) } }.frame(maxWidth: .infinity)
         }.buttonStyle(.plain).accessibilityLabel("查看完整 B30 成绩图")
         .task(id: signature) {
             for row in model.board.old + model.board.new { if Task.isCancelled { return }; _ = await model.art(row.chart) }

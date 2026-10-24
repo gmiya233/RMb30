@@ -8,7 +8,7 @@ struct CharacterBackdrop: View {
         ZStack(alignment: .topTrailing) {
             Palette.background
             if let url = Bundle.main.url(forResource: page, withExtension: "png"), let image = UIImage(contentsOfFile: url.path) {
-                Image(uiImage: image).resizable().scaledToFit().frame(width: 240, height: 330).opacity(0.12).accessibilityHidden(true)
+                Image(bitmap: image).resizable().scaledToFit().frame(width: 240, height: 330).opacity(0.12).accessibilityHidden(true)
             }
         }.ignoresSafeArea().allowsHitTesting(false)
     }

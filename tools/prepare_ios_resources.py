@@ -41,7 +41,7 @@ def main():
             (target / 'chart-keys.json').write_bytes(archive.read(info))
         except KeyError:
             pass
-    (target / 'build-info.json').write_text(json.dumps({'ios_version': '0.2.0', 'android_source_sha256': hashlib.sha256(args.apk.read_bytes()).hexdigest()}), encoding='utf-8')
+    (target / 'build-info.json').write_text(json.dumps({'ios_version': '0.2.1', 'android_source_sha256': hashlib.sha256(args.apk.read_bytes()).hexdigest()}), encoding='utf-8')
     print('Prepared bounded iOS catalogue and scoped app configuration; no player archives copied.')
 
 

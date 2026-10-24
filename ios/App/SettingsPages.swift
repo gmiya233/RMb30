@@ -52,7 +52,7 @@ struct SettingsPage: View {
                 }
                 Card {
                     Text("关于").font(.headline)
-                    Text("Malody Link · iOS 0.2.0").font(.subheadline)
+                    Text("Malody Link · iOS 0.2.1").font(.subheadline)
                     Button { Task { await checkUpdate() } } label: { Label(checking ? "检查中…" : "获取更新", systemImage: "arrow.down.app").frame(minHeight: 44) }.disabled(checking)
                     Text(updateStatus.isEmpty ? "iOS 包需自行签名安装，更新会打开 GitHub 发布页。" : updateStatus).font(.caption).foregroundStyle(.secondary)
                     Button("分享读取诊断") { share { try model.diagnosticURL() } }.frame(minHeight: 44)
@@ -83,7 +83,7 @@ struct SettingsPage: View {
             guard let releases = try JSONSerialization.jsonObject(with: bytes) as? [[String: Any]], let release = releases.first(where: { ($0["tag_name"] as? String ?? "").hasPrefix("ios-v") && $0["draft"] as? Bool != true }),
                   let link = release["html_url"] as? String, let target = URL(string: link), target.scheme == "https", target.host == "github.com", target.path.hasPrefix("/gmiya233/RMb30/releases/") else { throw MalodyError.invalid("尚无可用的 iOS 发布包") }
             let tag = release["tag_name"] as? String ?? ""
-            let latest = String(tag.dropFirst(5)), current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2.0"
+            let latest = String(tag.dropFirst(5)), current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2.1"
             guard latest.compare(current, options: .numeric) == .orderedDescending else { updateStatus = "当前版本 " + current + " 已是最新；最新公开发布为 " + latest; return }
             updateStatus = "最新发布：" + tag + "，请在发布页下载并自行签名。"
             openURL(target)
@@ -94,7 +94,7 @@ struct PlayerAvatar: View {
     let data: Data?
     var side: CGFloat = 64
     var body: some View {
-        Group { if let data, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFill() } else { Image(systemName: "person.crop.square.fill").resizable().scaledToFit().foregroundStyle(Palette.accent) } }.frame(width: side, height: side).clipShape(RoundedRectangle(cornerRadius: side * 0.18)).accessibilityLabel("玩家头像")
+        Group { if let data, let image = UIImage(data: data) { Image(bitmap: image).resizable().scaledToFill() } else { Image(systemName: "person.crop.square.fill").resizable().scaledToFit().foregroundStyle(Palette.accent) } }.frame(width: side, height: side).clipShape(RoundedRectangle(cornerRadius: side * 0.18)).accessibilityLabel("玩家头像")
     }
 }
 struct RatingPreviewControls: View {

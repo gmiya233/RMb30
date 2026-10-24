@@ -95,7 +95,7 @@ struct ArtView: View {
     var side: CGFloat = 64
     @State private var image: UIImage?
     var body: some View {
-        ZStack { RoundedRectangle(cornerRadius: 12).fill(Palette.selected); if let image { Image(uiImage: image).resizable().scaledToFill() } else { Image(systemName: "music.note").font(.title2).foregroundStyle(Palette.accent) } }
+        ZStack { RoundedRectangle(cornerRadius: 12).fill(Palette.selected); if let image { Image(bitmap: image).resizable().scaledToFill() } else { Image(systemName: "music.note").font(.title2).foregroundStyle(Palette.accent) } }
             .frame(width: side, height: side).clipShape(RoundedRectangle(cornerRadius: 12))
             .accessibilityLabel(chart.title + "曲绘")
             .task(id: chart.cid) { image = nil; if let data = await model.art(chart) { image = UIImage(data: data) } }

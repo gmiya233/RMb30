@@ -215,7 +215,7 @@ import MalodyCore
         try? bytes.write(to: path, options: .atomic); return bytes
     }
     func diagnosticURL() throws -> URL {
-        var report: [String: Any] = ["app_version": "0.2.0-ios", "system": "iOS", "chart_count": catalogue.charts.count,
+        var report: [String: Any] = ["app_version": "0.2.1-ios", "system": "iOS", "chart_count": catalogue.charts.count,
                                       "record_count": state.records.count, "directory_selected": !folderName.isEmpty,
                                       "catalogue_revision": catalogue.revision(), "created_at": ISO8601DateFormatter().string(from: Date())]
         if let lastImport { report["last_import"] = try JSONSerialization.jsonObject(with: JSONCoding.encode(lastImport)) }
