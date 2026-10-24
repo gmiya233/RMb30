@@ -27,3 +27,18 @@ android/assets/default-reader.json
 android/assets/default-rank.json
 android/generated/
 *.class
+ios/.build/
+ios/.swiftpm/
+ios/*.xcodeproj/
+ios/Resources/runtime-config.json
+ios/Resources/catalog.json
+ios/Resources/reader-config.json
+ios/Resources/build-info.json
+*.xcuserstate
+*.ipa
+ios/App/Info.plist
+ios/App/Assets.xcassets/
+
+# Generated iOS public resources
+ios/Resources/*.png
+ios/Resources/chart-keys.json
