@@ -56,11 +56,11 @@ struct PosterCanvas: View {
                 }.clipShape(RoundedRectangle(cornerRadius: 8))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(row.chart.title).font(.system(size: 19, weight: .semibold)).lineLimit(2).frame(height: 44, alignment: .top)
-                    Text(row.chart.levelLabel + " · " + row.chart.keysLabel).font(.system(size: 17, weight: .bold)).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.65)
+                    Text(row.displayedLevel + " · " + row.chart.keysLabel + (row.simulated ? " *" : "")).font(.system(size: 17, weight: .bold)).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.65)
                     Text(row.record.score.formatted(.number.locale(Locale(identifier: "en_US")))).font(.system(size: 23, weight: .bold)).lineLimit(1).minimumScaleFactor(0.65)
                 }.frame(height: 94, alignment: .top)
             }
-            HStack { Text(Rating.judgeName(row.record.judge)); Spacer(); Text("\(row.record.accuracy, specifier: "%.3f")%") }.font(.system(size: 16)).foregroundStyle(color)
+            HStack { Text(Rating.judgeName(row.displayedJudge)); Spacer(); Text("\(row.displayedAccuracy, specifier: "%.3f")%") }.font(.system(size: 16)).foregroundStyle(color)
             HStack { Text("rating").font(.system(size: 16)); Text(row.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 20, weight: .bold)).foregroundStyle(color).monospacedDigit() }
         }.padding(8).frame(height: 166).frame(maxWidth: .infinity, alignment: .leading).background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 14))
     }
@@ -73,13 +73,18 @@ struct B30Page: View {
     @State private var sharing = false
     @State private var zooming = false
     @State private var choosingTitle = false
+    @State private var demo = false
+    private var displayedBoard: ScoreBoard { demo ? ExamplePoster.board(model.catalogue) : model.previewBoard }
     @State private var title = ""
-    private var signature: String { (model.previewBoard.old + model.previewBoard.new).map(\.record.id).joined() + model.playerName + model.playerTitle + String(describing: model.preview) + String(model.showingPreview) + String(model.state.avatar?.hashValue ?? 0) }
+    private var signature: String { String(demo) + (model.previewBoard.old + model.previewBoard.new).map(\.record.id).joined() + model.playerName + model.playerTitle + String(describing: model.preview) + String(model.showingPreview) + String(model.state.avatar?.hashValue ?? 0) }
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
                 Button { model.syncCloud(upload: true) } label: { Label("上传成绩到服务器和排行榜", systemImage: "icloud.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.borderedProminent).tint(.green).disabled(model.busy || !model.ready)
+                Toggle("查看示例布局", isOn: $demo)
+                if demo { Text("示例成绩，仅用于查看排版，不参与同步与排行").font(.caption).foregroundStyle(.orange) }
                 RatingPreviewControls()
+                Text(model.status).font(.caption).foregroundStyle(.secondary)
                 if model.showingPreview { Text("当前为模拟成绩图").font(.caption).foregroundStyle(.orange) }
                 HStack(spacing: 16) {
                     icon("square.and.arrow.up", label: "保存或分享成绩图") { sharing = true }.disabled(image == nil)
@@ -102,9 +107,9 @@ struct B30Page: View {
     private func icon(_ system: String, label: String, action: @escaping () -> Void) -> some View { Button(action: action) { Image(systemName: system).font(.title3).frame(width: 52, height: 50) }.buttonStyle(.bordered).accessibilityLabel(label) }
     private func render() async {
         generating = true; defer { generating = false }
-        for row in model.previewBoard.old + model.previewBoard.new { if Task.isCancelled { return }; _ = await model.art(row.chart) }
+        for row in displayedBoard.old + displayedBoard.new { if Task.isCancelled { return }; _ = await model.art(row.chart) }
         guard !Task.isCancelled else { return }
-        let renderer = ImageRenderer(content: PosterCanvas(board: model.previewBoard, player: model.playerName, title: model.playerTitle, avatar: model.state.avatar)); renderer.scale = 1
+        let renderer = ImageRenderer(content: PosterCanvas(board: displayedBoard, player: demo ? "示例玩家 · DEMO" : model.playerName, title: demo ? "示例布局" : model.playerTitle, avatar: demo ? nil : model.state.avatar)); renderer.scale = 1
         image = renderer.uiImage
     }
 }
@@ -139,5 +144,27 @@ struct HomePosterThumbnail: View {
             guard !Task.isCancelled else { return }
             let renderer = ImageRenderer(content: PosterCanvas(board: model.board, player: model.playerName, title: model.playerTitle, avatar: model.state.avatar)); renderer.scale = 0.5; image = renderer.uiImage
         }
+    }
+}
+
+/// Demonstration records exist only in this view's rendered board, never LocalState.
+enum ExamplePoster {
+    static func board(_ catalogue: Catalogue) -> ScoreBoard {
+        var selected: [Chart] = [], seen = Set<String>(), old = 0, fresh = 0
+        for chart in catalogue.charts.sorted(by: { $0.cid < $1.cid }) where chart.level != nil {
+            let isNew = catalogue.promotedSongs.contains(chart.identity)
+            if seen.contains(chart.identity) || (isNew ? fresh >= 10 : old >= 20) { continue }
+            seen.insert(chart.identity); selected.append(chart)
+            if isNew { fresh += 1 } else { old += 1 }
+            if old == 20 && fresh == 10 { break }
+        }
+        let records = selected.enumerated().compactMap { index, chart -> ScoreRecord? in
+            let row: [String: Any] = ["id": "\(chart.cid):0:" + String(repeating: "0", count: 32), "cid": chart.cid, "server_hash": chart.serverHash,
+                "chart_md5": String(repeating: "0", count: 32), "player": "DEMO", "played_at": 0, "score_candidate": 1_000_000 - index * 1000,
+                "accuracy_candidate": 99.9 - Double(index % 10) * 0.1, "raw_score_fields": ["4": 4], "verification": "preview_only", "field_mapping_verified": false, "uploaded": false]
+            guard let data = try? JSONSerialization.data(withJSONObject: row) else { return nil }
+            return try? JSONCoding.decode(ScoreRecord.self, data)
+        }
+        return ScoreBoard(records: records, catalogue: catalogue)
     }
 }

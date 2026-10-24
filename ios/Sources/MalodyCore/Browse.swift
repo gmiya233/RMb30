@@ -42,15 +42,17 @@ public enum SongBrowse {
     }
 }
 
-public struct RatingPreview {
+public struct RatingPreview: Codable {
     public var multipliers: [Double] = [0, 0.78, 0.85, 1, 1.1, 1.2]
     public var judge = 0
     public var levels: [Int: Double] = [:]
+    public var accuracies: [Int: Double] = [:]
+    public var judges: [Int: Int] = [:]
     public init() {}
     public func value(chart: Chart, record: ScoreRecord) -> Double? {
-        let j = judge == 0 ? record.judge : judge
+        let j = judge == 0 ? (judges[chart.cid] ?? record.judge) : judge
         guard multipliers.count == 6, (1...5).contains(j), multipliers[j].isFinite, multipliers[j] > 0, multipliers[j] <= 10,
-              let factor = Rating.accuracyFactor(record.accuracy), let level = levels[chart.cid].flatMap({ Rating.level(raw: $0, version: "") }) ?? chart.level else { return nil }
+              let factor = Rating.accuracyFactor(accuracies[chart.cid] ?? record.accuracy), let level = levels[chart.cid].flatMap({ Rating.level(raw: $0, version: "") }) ?? chart.level else { return nil }
         return level * factor * multipliers[j]
     }
 }

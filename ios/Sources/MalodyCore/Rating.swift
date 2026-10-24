@@ -43,13 +43,20 @@ public struct RatedScore: Identifiable {
     public let record: ScoreRecord
     public let rating: Double
     public let isNew: Bool
+    public var accuracyOverride: Double? = nil
+    public var judgeOverride: Int? = nil
+    public var levelOverride: Double? = nil
+    public var simulated = false
+    public var displayedAccuracy: Double { accuracyOverride ?? record.accuracy }
+    public var displayedJudge: Int { judgeOverride ?? record.judge }
+    public var displayedLevel: String { levelOverride.flatMap { Rating.level(raw: $0, version: "") }.map { "Lv." + Rating.formatLevel($0) } ?? chart.levelLabel }
     public var id: String { record.id }
     public init(chart: Chart, record: ScoreRecord, rating: Double, isNew: Bool) {
         self.chart = chart; self.record = record; self.rating = rating; self.isNew = isNew
     }
     public static func better(_ lhs: RatedScore, _ rhs: RatedScore) -> Bool {
         if lhs.rating != rhs.rating { return lhs.rating > rhs.rating }
-        if lhs.record.accuracy != rhs.record.accuracy { return lhs.record.accuracy > rhs.record.accuracy }
+        if lhs.displayedAccuracy != rhs.displayedAccuracy { return lhs.displayedAccuracy > rhs.displayedAccuracy }
         if lhs.record.score != rhs.record.score { return lhs.record.score > rhs.record.score }
         return lhs.chart.cid < rhs.chart.cid
     }
@@ -66,7 +73,12 @@ public struct ScoreBoard {
         var songs: [String: RatedScore] = [:]
         for record in catalogue.filtered(records) {
             guard let chart = charts[record.cid], let rating = preview == nil ? Rating.score(chart: chart, record: record) : preview!.value(chart: chart, record: record) else { continue }
-            let row = RatedScore(chart: chart, record: record, rating: rating, isNew: promoted.contains(chart.identity))
+            var row = RatedScore(chart: chart, record: record, rating: rating, isNew: promoted.contains(chart.identity))
+            if let preview {
+                row.accuracyOverride = preview.accuracies[chart.cid]
+                row.judgeOverride = preview.judge == 0 ? preview.judges[chart.cid] : preview.judge
+                row.levelOverride = preview.levels[chart.cid]; row.simulated = true
+            }
             if let previous = songs[chart.identity], !RatedScore.better(row, previous) { continue }
             songs[chart.identity] = row
         }

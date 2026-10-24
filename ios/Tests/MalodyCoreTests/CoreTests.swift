@@ -106,7 +106,11 @@ final class CoreTests: XCTestCase {
         var preview = RatingPreview(); preview.judge = 5; preview.levels[c.cid] = 15
         XCTAssertGreaterThan(ScoreBoard(records: [r], catalogue: catalogue, preview: preview).rating, actual)
         XCTAssertEqual(ScoreBoard(records: [r], catalogue: catalogue).rating, actual)
-        preview.multipliers[5] = .nan; XCTAssertNil(preview.value(chart: c, record: r))
+        preview.accuracies[c.cid] = 95; preview.judges[c.cid] = 2; preview.judge = 0
+        let adjusted = try XCTUnwrap(ScoreBoard(records: [r], catalogue: catalogue, preview: preview).old.first)
+        XCTAssertEqual(adjusted.displayedAccuracy, 95); XCTAssertEqual(adjusted.displayedJudge, 2)
+        XCTAssertEqual(adjusted.record, r); XCTAssertTrue(adjusted.simulated)
+        preview.multipliers[2] = .nan; XCTAssertNil(preview.value(chart: c, record: r))
     }
     func testReviewValidation() throws {
         let bytes = try CommunityDocument.review(server: "https://fixture.invalid", topic: "s1", qq: "2033383178", name: "PLAYER", stars: 5, text: "好玩")

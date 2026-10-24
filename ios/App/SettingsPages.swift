@@ -98,16 +98,31 @@ struct RatingPreviewControls: View {
     @EnvironmentObject var model: AppModel
     @State private var cid = ""
     @State private var level = ""
+    @State private var accuracy = ""
+    @State private var entryJudge = 0
+    @State private var notice = ""
+    private var entries: [Chart] { Dictionary(grouping: model.state.records, by: \.cid).keys.compactMap { model.catalogue.byCID[$0] }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
     var body: some View {
         DisclosureGroup("Rating 模拟设置") {
             VStack(alignment: .leading, spacing: 12) {
                 Toggle("启用模拟", isOn: $model.showingPreview)
                 Picker("模拟判定", selection: $model.preview.judge) { Text("实际判定").tag(0); ForEach(1...5, id: \.self) { Text(Rating.judgeName($0)).tag($0) } }
                 ForEach(1...5, id: \.self) { j in HStack { Text(Rating.judgeName(j)); Spacer(); TextField("倍率", value: $model.preview.multipliers[j], format: .number).keyboardType(.decimalPad).textFieldStyle(.roundedBorder).frame(width: 90) } }
-                HStack { TextField("谱面 CID", text: $cid).keyboardType(.numberPad); TextField("模拟等级", text: $level).keyboardType(.decimalPad) }.textFieldStyle(.roundedBorder)
-                Button("应用谱面模拟等级") { if let id = Int(cid), model.catalogue.byCID[id] != nil, let value = Double(level), value.isFinite, value > 0, value <= 40 { model.preview.levels[id] = value } }.frame(minHeight: 44)
+                Picker("调整单曲", selection: $cid) { Text("选择已游玩谱面").tag(""); ForEach(entries) { chart in Text(chart.title + " · " + chart.version).tag(String(chart.cid)) } }
+                HStack { TextField("原始等级", text: $level); TextField("准度 %", text: $accuracy) }.keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
+                Picker("单曲判定", selection: $entryJudge) { Text("实际判定").tag(0); ForEach(1...5, id: \.self) { Text(Rating.judgeName($0)).tag($0) } }
+                Button("应用单曲预览参数") {
+                    guard let id = Int(cid), model.catalogue.byCID[id] != nil else { notice = "请先选择谱面"; return }
+                    if !level.isEmpty { guard let n = Double(level), n.isFinite, n > 0, n <= 100 else { notice = "等级需在0～100之间"; return } }
+                    if !accuracy.isEmpty { guard let n = Double(accuracy), n.isFinite, (0...100).contains(n) else { notice = "准度需在0～100%之间"; return } }
+                    if let n = Double(level) { model.preview.levels[id] = n } else { model.preview.levels.removeValue(forKey: id) }
+                    if let n = Double(accuracy) { model.preview.accuracies[id] = n } else { model.preview.accuracies.removeValue(forKey: id) }
+                    if entryJudge > 0 { model.preview.judges[id] = entryJudge } else { model.preview.judges.removeValue(forKey: id) }
+                    model.showingPreview = true; notice = "已应用，模拟卡片以 * 标记"
+                }.frame(minHeight: 44)
+                if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(Palette.accent) }
                 Button("恢复默认") { model.preview = RatingPreview(); model.showingPreview = false }.frame(minHeight: 44)
-                Text("模拟仅用于预览，不改变真实成绩、称号和上传数据。").font(.caption).foregroundStyle(.secondary)
+                Text("rating = 折算等级 × 准度系数 × 判定倍率。99.8%以上系数为1.01；99.5%以下为(准度/99.5)²。全图判定优先于单曲判定。模拟不改变真实成绩、称号和上传数据。").font(.caption).foregroundStyle(.secondary)
             }.padding(.vertical, 10)
         }.padding(16).background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
     }

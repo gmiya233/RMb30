@@ -21,7 +21,9 @@ import MalodyCore
     @Published var rankingLoading = false
     @Published var communityBoards: CommunityDocument?
     @Published var communityStatus = ""
-    @Published var preview = RatingPreview()
+    @Published var preview: RatingPreview = UserDefaults.standard.data(forKey: "rating-preview").flatMap { try? JSONCoding.decode(RatingPreview.self, $0) } ?? RatingPreview() {
+        didSet { if let data = try? JSONCoding.encode(preview) { UserDefaults.standard.set(data, forKey: "rating-preview") } }
+    }
     @Published var showingPreview = false
     var previewBoard: ScoreBoard { showingPreview ? ScoreBoard(records: state.records, catalogue: catalogue, preview: preview) : board }
     private let store = StateStore(), importer = DirectoryImporter(), catalogues = CatalogueStore()
