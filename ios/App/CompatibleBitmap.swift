@@ -32,6 +32,6 @@ extension Image {
         case .rightMirrored: orientation = .rightMirrored
         @unknown default: orientation = .up
         }
-        self.init(decorative: pixels, scale: image.scale, orientation: orientation)
+        self.init(pixels, scale: image.scale, orientation: orientation, label: Text(""))
     }
 }
