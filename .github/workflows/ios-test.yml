@@ -4,6 +4,11 @@ on:
     branches: [main, codex/ios-file-sync, codex/ios-android-parity]
     paths: ['ios/**', 'tools/prepare_ios_resources.py', '.github/workflows/ios-test.yml']
   workflow_dispatch:
+    inputs:
+      layout_only:
+        description: Recheck settled landscape after full suite passed
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -41,12 +46,16 @@ jobs:
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"]))')
-          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-UITests.xcresult test | tee build/ios-ui-tests.log
+          TEST_ARGS=()
+          if [ "${{ inputs.layout_only }}" = "true" ]; then TEST_ARGS+=('-only-testing:MalodyLinkUITests/AppUITests/testLandscapeNavigation'); fi
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug "${TEST_ARGS[@]}" -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-UITests.xcresult test | tee build/ios-ui-tests.log
       - name: Check iPad navigation and layouts
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPad" in d["name"]))')
-          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-iPad-UITests.xcresult test | tee build/ios-ipad-tests.log
+          TEST_ARGS=()
+          if [ "${{ inputs.layout_only }}" = "true" ]; then TEST_ARGS+=('-only-testing:MalodyLinkUITests/AppUITests/testLandscapeNavigation'); fi
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug "${TEST_ARGS[@]}" -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-iPad-UITests.xcresult test | tee build/ios-ipad-tests.log
       - name: Export iPad screenshots
         if: always() && hashFiles('build/iOS-iPad-UITests.xcresult/Info.plist') != ''
         run: xcrun xcresulttool export attachments --path build/iOS-iPad-UITests.xcresult --output-path build/ios-screenshots/ipad

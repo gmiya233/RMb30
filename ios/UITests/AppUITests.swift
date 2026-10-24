@@ -49,6 +49,11 @@ final class AppUITests: XCTestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         app.buttons["歌曲"].tap()
         XCTAssertTrue(app.textFields["搜索歌曲"].waitForExistence(timeout: 10))
+        let stable = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let frame = self.app.windows.firstMatch.frame
+            return frame.width > frame.height && self.app.buttons["设置"].isHittable && self.app.textFields["搜索歌曲"].isHittable
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [stable], timeout: 20), .completed)
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "Landscape song browser"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
     func testAccessibleTextSettings() throws {
