@@ -54,7 +54,7 @@ final class AppUITests: XCTestCase {
             return frame.width > frame.height && self.app.buttons["设置"].isHittable && self.app.textFields["搜索歌曲"].isHittable
         }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [stable], timeout: 20), .completed)
-        let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "Landscape song browser"; screenshot.lifetime = .keepAlways; add(screenshot)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); screenshot.name = "Landscape song browser"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
     func testAccessibleTextSettings() throws {
         app.terminate()
