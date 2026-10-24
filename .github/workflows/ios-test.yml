@@ -5,6 +5,10 @@ on:
     paths: ['ios/**', 'tools/prepare_ios_resources.py', '.github/workflows/ios-test.yml']
   workflow_dispatch:
     inputs:
+      startup_only:
+        description: Check optimized startup with complete bundled resources
+        type: boolean
+        default: false
       layout_only:
         description: Recheck settled landscape after full suite passed
         type: boolean
@@ -41,21 +45,33 @@ jobs:
           set -o pipefail
           xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/ios-device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build | tee build/ios-build.log
           python3 tools/package_ios.py build/ios-device/Build/Products/Release-iphoneos/MalodyLink.app
+      - name: Check normal Release startup with full catalogue
+        run: |
+          set -o pipefail
+          xcodebuild -version
+          xcrun simctl list runtimes
+          DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPad" in d["name"]))')
+          xcrun simctl boot "$DEVICE" || true
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Release -parallel-testing-enabled NO -only-testing:MalodyLinkUITests/StartupUITests -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-release-simulator -resultBundlePath build/iOS-Release-Startup.xcresult test | tee build/ios-release-startup.log
+      - name: Export Release startup evidence
+        if: always() && hashFiles('build/iOS-Release-Startup.xcresult/Info.plist') != ''
+        run: xcrun xcresulttool export attachments --path build/iOS-Release-Startup.xcresult --output-path build/ios-screenshots/release-startup
       - name: Check native navigation and local synthetic import on simulator
-        if: hashFiles('ios/project.yml') != ''
+        if: inputs.startup_only != true && hashFiles('ios/project.yml') != ''
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"]))')
           xcrun simctl boot "$DEVICE" || true
-          TEST_ARGS=()
+          TEST_ARGS=('-only-testing:MalodyLinkUITests/AppUITests')
           if [ "${{ inputs.layout_only }}" = "true" ]; then TEST_ARGS+=('-only-testing:MalodyLinkUITests/AppUITests/testLandscapeNavigation'); fi
           xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -parallel-testing-enabled NO "${TEST_ARGS[@]}" -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-UITests.xcresult test | tee build/ios-ui-tests.log
       - name: Check iPad navigation and layouts
+        if: inputs.startup_only != true
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPad" in d["name"]))')
           xcrun simctl boot "$DEVICE" || true
-          TEST_ARGS=()
+          TEST_ARGS=('-only-testing:MalodyLinkUITests/AppUITests')
           if [ "${{ inputs.layout_only }}" = "true" ]; then TEST_ARGS+=('-only-testing:MalodyLinkUITests/AppUITests/testLandscapeNavigation'); fi
           xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -parallel-testing-enabled NO "${TEST_ARGS[@]}" -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-iPad-UITests.xcresult test | tee build/ios-ipad-tests.log
       - name: Export iPad screenshots
@@ -83,6 +99,8 @@ jobs:
           name: iOS-build-diagnostics
           path: |
             build/ios-build.log
+            build/ios-release-startup.log
+            build/iOS-Release-Startup.xcresult
             build/ios-ui-tests.log
             build/ios-ipad-tests.log
             build/iOS-iPad-UITests.xcresult
