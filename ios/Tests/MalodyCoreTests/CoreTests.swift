@@ -116,4 +116,22 @@ final class CoreTests: XCTestCase {
         XCTAssertThrowsError(try CommunityDocument.review(server: "x", topic: "s1", qq: "12345", name: "P", stars: 0, text: ""))
         XCTAssertThrowsError(try CommunityDocument.review(server: "x", topic: "s1", qq: "12345", name: "P", stars: 5, text: String(repeating: "a", count: 501)))
     }
+    func testRecentKeepsUnratedPlaysAndCommunityNamespace() throws {
+        let unknown = try chart(level: 0, version: "4K")
+        let catalogue = Catalogue(server: "https://fixture.invalid", charts: [unknown])
+        let r = try record(unknown)
+        let recent = SongBrowse.recent([r], catalogue: catalogue)
+        XCTAssertEqual(recent.count, 1); XCTAssertFalse(try XCTUnwrap(recent.first).rating.isFinite)
+        XCTAssertTrue(SongBrowse.search([unknown], hideUnrated: true).isEmpty)
+        let boards: [String: [[String: Any]]] = Dictionary(uniqueKeysWithValues: CommunityDocument.sections.map { ($0.0, []) })
+        var doc: [String: Any] = ["schema": 1, "server": catalogue.server, "revision": catalogue.revision(), "updated": Date().timeIntervalSince1970 * 1000, "boards": boards]
+        XCTAssertNoThrow(try CommunityDocument(data: JSONSerialization.data(withJSONObject: doc), catalogue: catalogue))
+        doc["revision"] = "wrong"; XCTAssertThrowsError(try CommunityDocument(data: JSONSerialization.data(withJSONObject: doc), catalogue: catalogue))
+        doc.removeValue(forKey: "boards"); doc["revision"] = catalogue.revision(); doc["topic"] = "s1"; doc["reviews"] = []; doc["average"] = 0; doc["rating_count"] = 0; doc["chart_downloads"] = ["1": 123]
+        let song = try CommunityDocument(data: JSONSerialization.data(withJSONObject: doc), catalogue: catalogue, topic: "s1")
+        XCTAssertEqual(song.chartDownloads[1], 123)
+        XCTAssertThrowsError(try CommunityDocument(data: JSONSerialization.data(withJSONObject: doc), catalogue: catalogue, topic: "s2"))
+        doc["average"] = 5
+        XCTAssertThrowsError(try CommunityDocument(data: JSONSerialization.data(withJSONObject: doc), catalogue: catalogue, topic: "s1"))
+    }
 }

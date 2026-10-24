@@ -110,7 +110,7 @@ struct ScoreRow: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(score.chart.title).font(.headline).lineLimit(2)
                 Text("\(score.chart.levelLabel) · \(score.chart.keysLabel) · \(Rating.judgeName(score.record.judge)) · \(score.record.accuracy, specifier: "%.3f")%").font(.caption).foregroundStyle(.secondary)
-                HStack { Text(score.record.score, format: .number); Spacer(); Text("rating \(score.rating, specifier: "%.4f")").foregroundStyle(Palette.accent) }.font(.subheadline.weight(.semibold)).monospacedDigit()
+                HStack { Text(score.record.score, format: .number); Spacer(); Text(score.rating.isFinite ? "rating " + String(format: "%.4f", score.rating) : "rating 待定").foregroundStyle(Palette.accent) }.font(.subheadline.weight(.semibold)).monospacedDigit()
                 Text(Date(timeIntervalSince1970: Double(score.record.playedAt)), format: .dateTime.month().day().hour().minute()).font(.caption2).foregroundStyle(.secondary)
             }
         }

@@ -35,7 +35,8 @@ public enum SongBrowse {
     public static func recent(_ records: [ScoreRecord], catalogue: Catalogue, limit: Int = 50) -> [RatedScore] {
         let charts = catalogue.byCID, promoted = catalogue.promotedSongs
         return catalogue.filtered(records).sorted { $0.playedAt != $1.playedAt ? $0.playedAt > $1.playedAt : $0.id < $1.id }.compactMap { r in
-            guard let c = charts[r.cid], let rating = Rating.score(chart: c, record: r) else { return nil }
+            guard let c = charts[r.cid] else { return nil }
+            let rating = Rating.score(chart: c, record: r) ?? .nan
             return RatedScore(chart: c, record: r, rating: rating, isNew: promoted.contains(c.identity))
         }.prefix(max(0, limit)).map { $0 }
     }
