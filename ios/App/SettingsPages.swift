@@ -101,7 +101,7 @@ struct RatingPreviewControls: View {
     @State private var accuracy = ""
     @State private var entryJudge = 0
     @State private var notice = ""
-    private var entries: [Chart] { Dictionary(grouping: model.state.records, by: \.cid).keys.compactMap { model.catalogue.byCID[$0] }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
+    private var entries: [Chart] { let charts = model.catalogue.byCID; return Set(model.state.records.map(\.cid)).compactMap { charts[$0] }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
     var body: some View {
         DisclosureGroup("Rating 模拟设置") {
             VStack(alignment: .leading, spacing: 12) {

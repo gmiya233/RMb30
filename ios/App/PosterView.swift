@@ -151,8 +151,9 @@ struct HomePosterThumbnail: View {
 enum ExamplePoster {
     static func board(_ catalogue: Catalogue) -> ScoreBoard {
         var selected: [Chart] = [], seen = Set<String>(), old = 0, fresh = 0
+        let promoted = catalogue.promotedSongs
         for chart in catalogue.charts.sorted(by: { $0.cid < $1.cid }) where chart.level != nil {
-            let isNew = catalogue.promotedSongs.contains(chart.identity)
+            let isNew = promoted.contains(chart.identity)
             if seen.contains(chart.identity) || (isNew ? fresh >= 10 : old >= 20) { continue }
             seen.insert(chart.identity); selected.append(chart)
             if isNew { fresh += 1 } else { old += 1 }
