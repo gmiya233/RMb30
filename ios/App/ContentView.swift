@@ -58,7 +58,7 @@ struct HomePage: View {
                     Text(model.previewBoard.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 50, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(Palette.ink)
                     HStack { metric("O20", model.board.old.count, 20); Spacer(); metric("N10", model.board.new.count, 10); Spacer(); VStack(alignment: .leading) { Text("成绩记录").font(.caption).foregroundStyle(.secondary); Text("\(model.state.records.count)").font(.title3.bold()) } }
                     Divider()
-                    Label(model.playerName + " · " + model.playerTitle, systemImage: "person.crop.circle").font(.subheadline)
+                    HStack { PlayerAvatar(data: model.state.avatar, side: 40); Text(model.playerName + " · " + model.playerTitle).font(.subheadline) }
                 }
                 RatingPreviewControls()
                 Card {
@@ -72,7 +72,7 @@ struct HomePage: View {
                 Card {
                     HStack { Text("我的 B30").font(.title3.bold()); Spacer(); Button { model.selectedTab = 1 } label: { Image(systemName: "arrow.up.right") }.accessibilityLabel("查看 B30").frame(width: 44, height: 44) }
                     HStack { Text("O20").foregroundStyle(Palette.accent); Text(model.board.oldRating, format: .number.precision(.fractionLength(4))).monospacedDigit(); Spacer(); Text("N10").foregroundStyle(.purple); Text(model.board.newRating, format: .number.precision(.fractionLength(4))).monospacedDigit() }
-                    if model.state.records.isEmpty { Text("同步成绩后生成你的成绩图").font(.footnote).foregroundStyle(.secondary) }
+                    HomePosterThumbnail()
                 }
                 VStack(alignment: .leading, spacing: 12) {
                     Text("最近游玩 · R50").font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
@@ -111,6 +111,7 @@ struct ScoreRow: View {
                 Text(score.chart.title).font(.headline).lineLimit(2)
                 Text("\(score.chart.levelLabel) · \(score.chart.keysLabel) · \(Rating.judgeName(score.record.judge)) · \(score.record.accuracy, specifier: "%.3f")%").font(.caption).foregroundStyle(.secondary)
                 HStack { Text(score.record.score, format: .number); Spacer(); Text("rating \(score.rating, specifier: "%.4f")").foregroundStyle(Palette.accent) }.font(.subheadline.weight(.semibold)).monospacedDigit()
+                Text(Date(timeIntervalSince1970: Double(score.record.playedAt)), format: .dateTime.month().day().hour().minute()).font(.caption2).foregroundStyle(.secondary)
             }
         }
     }
@@ -161,4 +162,3 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
-

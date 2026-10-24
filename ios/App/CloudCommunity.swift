@@ -62,8 +62,16 @@ extension CloudGateway {
         }
     }
     func keys(catalogue: Catalogue) async throws -> Catalogue {
-        let bytes = try await get("/_catalog/keys-v1.json", limit: 16_000_000)
-        return try catalogue.enrichKeys(bytes)
+        let cache = cacheURL(catalogue, "keys")
+        do {
+            let bytes = try await get("/_catalog/keys-v1.json", limit: 16_000_000)
+            let enriched = try catalogue.enrichKeys(bytes)
+            try bytes.write(to: cache, options: .atomic); return enriched
+        } catch {
+            try Task.checkCancellation()
+            guard let bytes = try? Data(contentsOf: cache) else { throw error }
+            return try catalogue.enrichKeys(bytes)
+        }
     }
     func board(catalogue: Catalogue, cid: Int) async throws -> RemoteBoard {
         do {

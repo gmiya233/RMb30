@@ -125,3 +125,19 @@ struct ZoomImage: UIViewRepresentable {
         override func layoutSubviews() { super.layoutSubviews(); if bounds.size != previous { previous = bounds.size; zoomScale = 1; picture.frame = bounds; contentSize = bounds.size } }
     }
 }
+
+struct HomePosterThumbnail: View {
+    @EnvironmentObject var model: AppModel
+    @State private var image: UIImage?
+    private var signature: String { (model.board.old + model.board.new).map(\.record.id).joined() + model.playerName + model.playerTitle + String(model.state.avatar?.hashValue ?? 0) }
+    var body: some View {
+        Button { model.selectedTab = 1 } label: {
+            Group { if let image { Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 420) } else { ProgressView("生成成绩缩略图…").frame(height: 180) } }.frame(maxWidth: .infinity)
+        }.buttonStyle(.plain).accessibilityLabel("查看完整 B30 成绩图")
+        .task(id: signature) {
+            for row in model.board.old + model.board.new { if Task.isCancelled { return }; _ = await model.art(row.chart) }
+            guard !Task.isCancelled else { return }
+            let renderer = ImageRenderer(content: PosterCanvas(board: model.board, player: model.playerName, title: model.playerTitle, avatar: model.state.avatar)); renderer.scale = 0.5; image = renderer.uiImage
+        }
+    }
+}

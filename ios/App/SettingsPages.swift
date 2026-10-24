@@ -6,6 +6,7 @@ import MalodyCore
 struct SettingsPage: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var chooseFolder = false
     @State private var qq = ""
     @State private var name = ""
@@ -26,7 +27,7 @@ struct SettingsPage: View {
                     Text(model.folderName.isEmpty ? "尚未授权" : "已授权：" + model.folderName).font(.caption)
                     Button("选择 Malody V 文件夹") { chooseFolder = true }.buttonStyle(.borderedProminent).frame(minHeight: 44)
                 }
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: typeSize.isAccessibilitySize ? 1 : 2), alignment: .leading, spacing: 12) {
                     action("同步本机成绩", icon: "arrow.triangle.2.circlepath") { model.importScores() }
                     action("解除目录关联", icon: "folder.badge.minus") { model.forgetFolder() }
                     action("上传并合并云端", icon: "icloud.and.arrow.up") { model.syncCloud(upload: true) }

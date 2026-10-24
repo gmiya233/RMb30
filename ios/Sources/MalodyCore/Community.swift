@@ -58,14 +58,14 @@ public struct CommunityDocument {
                           let rank = row["rank"] as? Int, (1...50).contains(rank) else { throw MalodyError.invalid("榜单条目无效") }
                     let average = row["average"] as? Double ?? 0, rating = row["rating"] as? Double ?? 0
                     let downloads = (row["downloads"] as? NSNumber)?.int64Value ?? 0, votes = row["rating_count"] as? Int ?? 0
-                    guard average.isFinite, (0...5).contains(average), rating.isFinite, rating >= 0, downloads >= 0, votes >= 0 else { throw MalodyError.invalid("榜单统计无效") }
+                    guard average.isFinite, (0...5).contains(average), rating.isFinite, rating >= 0, downloads >= 0, votes >= 0, (votes == 0 ? average == 0 : average >= 1) else { throw MalodyError.invalid("榜单统计无效") }
                     rows.append(CommunityRow(id: identity, name: name, rank: rank, cid: row["cid"] as? Int ?? 0, votes: votes, downloads: downloads, average: average, rating: rating))
                 }
                 tables[key] = rows
             }
         }
         average = doc["average"] as? Double ?? 0; votes = doc["rating_count"] as? Int ?? 0
-        guard average.isFinite, (0...5).contains(average), votes >= 0, entries.count <= votes else { throw MalodyError.invalid("歌曲评分统计无效") }
+        guard average.isFinite, (0...5).contains(average), votes >= 0, entries.count <= votes, (votes == 0 ? average == 0 : average >= 1) else { throw MalodyError.invalid("歌曲评分统计无效") }
         boards = tables; reviews = entries.sorted { $0.updated > $1.updated }; chartDownloads = counts
     }
     public static func review(server: String, topic: String, qq: String, name: String, stars: Int, text: String) throws -> Data {
