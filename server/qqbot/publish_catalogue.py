@@ -61,7 +61,7 @@ def publish_b30(catalogue, target):
         if not re.fullmatch('[1-9][0-9]{4,11}', qq):
             raise ValueError('Invalid player identifier')
         # rt.json is published just before private state; skip during that tiny transition.
-        if any(player[k] != ranked[qq][k] for k in ('rating', 'o', 'n', 'oc', 'nc', 'name')):
+        if any(player.get(k) != ranked[qq].get(k) for k in ('rating', 'o', 'n', 'oc', 'nc', 'name', 'title')):
             continue
         doc = prepare(player, catalogue, revision, totals['updated'])
         atomic(target / 'b30' / revision / (qq + '.json'), json.dumps(doc, ensure_ascii=False, separators=(',', ':')).encode())

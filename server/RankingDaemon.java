@@ -47,7 +47,8 @@ public final class RankingDaemon {
         public void remove(String p,List<String> n)throws Exception{throw new IOException("Read only");}
     };}
     private String signature(String qq,List<String> names)throws Exception {
-        StringBuilder value=new StringBuilder();for(String n:names){Path p=root.resolve(qq).resolve(n);BasicFileAttributes a=Files.readAttributes(p,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);value.append(n).append(':').append(a.size()).append(':').append(a.lastModifiedTime()).append('\n');}
+        List<String> tracked=new ArrayList<>(names);if(Files.exists(root.resolve(qq).resolve(PlayerTitle.FILE),LinkOption.NOFOLLOW_LINKS))tracked.add(PlayerTitle.FILE);
+        StringBuilder value=new StringBuilder();for(String n:tracked){Path p=root.resolve(qq).resolve(n);BasicFileAttributes a=Files.readAttributes(p,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);value.append(n).append(':').append(a.size()).append(':').append(a.lastModifiedTime()).append('\n');}
         return CloudRecords.sha256(value.toString().getBytes(StandardCharsets.UTF_8));
     }
     private static void atomic(Path path,JSONObject json)throws Exception {
@@ -75,7 +76,9 @@ public final class RankingDaemon {
                 CloudArchive.Result merged=CloudArchive.sync(source,qq,server,new JSONArray(),charts,false,p->{});
                 if(!names.equals(source.list(qq,false))||!stamp.equals(signature(qq,names)))throw new IOException("Source changed during indexing");
                 if(merged.merged.conflicts>0)throw new IOException("Conflicting history records require administrator review");
-                player=RankingData.player(qq,merged.merged.scores,charts);changed++;
+                player=RankingData.player(qq,merged.merged.scores,charts);
+                JSONObject appearance=null;try{Path title=root.resolve(qq).resolve(PlayerTitle.FILE);if(Files.exists(title,LinkOption.NOFOLLOW_LINKS))appearance=new JSONObject(new String(read(title,4096),StandardCharsets.UTF_8));}catch(Exception invalidTitle){}
+                player.title=PlayerTitle.resolve(appearance,qq,server,merged.merged.scores,charts,player.rating);changed++;
             }
             if(verify){
                 RankingIndex.Heads heads=RankingIndex.read(legacy(),server,revision,0,qq,charts);

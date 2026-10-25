@@ -11,7 +11,7 @@ import java.nio.ByteBuffer;
 import org.json.*;
 import java.util.*;
 
-/** Device-local appearance, deliberately outside score exports and cloud records. */
+/** Nickname/avatar are local; the selected unlocked title can sync separately. */
 public final class LocalPlayerProfile {
     public static final String DEFAULT_TITLE="小师妹";
     public static String ratingTitle(double rating){if(!Double.isFinite(rating)||rating<10)return DEFAULT_TITLE;if(rating<11)return "萌新";if(rating<12)return "高手";if(rating<13)return "大师";return "龙币";}
@@ -28,7 +28,7 @@ public final class LocalPlayerProfile {
     }
     public static String selectedTitleKey(Context c,Engine engine){android.content.SharedPreferences p=c.getSharedPreferences("appearance",0);return engine.server.equals(p.getString("title_server_"+key(c),""))?p.getString("title_"+key(c),""):"";}
     public static String title(Context c,Engine engine)throws Exception{double rating=actualRating(c,engine);Map<String,String> choices=ratingTitles(rating);choices.putAll(eligibleTitles(engine));return choices.getOrDefault(selectedTitleKey(c,engine),ratingTitle(rating));}
-    public static void saveTitle(Context c,Engine engine,String selected)throws Exception {if(!selected.isEmpty()&&!titleChoices(c,engine).containsKey(selected))throw new IOException("该称号尚未解锁，请重新选择");if(!c.getSharedPreferences("appearance",0).edit().putString("title_"+key(c),selected).putString("title_server_"+key(c),engine.server).commit())throw new IOException("称号保存失败");}
+    public static void saveTitle(Context c,Engine engine,String selected)throws Exception {if(!selected.isEmpty()&&!titleChoices(c,engine).containsKey(selected))throw new IOException("该称号尚未解锁，请重新选择");if(!c.getSharedPreferences("appearance",0).edit().putString("title_"+key(c),selected).putString("title_server_"+key(c),engine.server).commit())throw new IOException("称号保存失败");if(CloudScoreSync.automatic(c)&&!ScoreSyncGate.busy())try{CloudSyncService.request(c,true,true);}catch(RuntimeException pending){/* Kept locally; normal score upload retries. */}}
     public static Bitmap avatarBitmap(Context c){try(InputStream in=new AtomicFile(avatar(c)).openRead()){return BitmapFactory.decodeStream(in);}catch(Exception missing){return null;}}
     public static Bitmap prepareAvatar(InputStream stream)throws Exception {
         byte[] bytes=Engine.read(stream,12*1024*1024);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);

@@ -29,7 +29,9 @@ class B30Tests(unittest.TestCase):
                   dict(cid=3, sid=2, title='Two', level=22), dict(cid=4, sid=3, title='Three', level=10)]
         scores = [dict(cid=i, rating=r, accuracy=99.8, score=100000, judge=3) for i, r in [(1, 12), (2, 13), (3, 11), (4, 10)]]
         p = dict(qq='10001', name='Test Player', best=scores, rating=34/30, o=21/20, n=13/10, oc=2, nc=1)
+        p['title'] = 'Fixture song title'
         result = prepare(p, dict(server='fixture', charts=charts), 'a'*64, 1792700000000)
+        self.assertEqual(result['player_title'], 'Fixture song title')
         self.assertEqual([r['cid'] for r in result['old']], [3, 4])
         self.assertEqual([r['cid'] for r in result['new']], [2])
         self.assertEqual(result['new'][0]['level'], 13)

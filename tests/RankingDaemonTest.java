@@ -22,6 +22,15 @@ public final class RankingDaemonTest {
         Path empty=root.resolve(RankingSnapshot.path(revision,2).substring(1));check(RankingSnapshot.read(Files.readAllBytes(empty),server,revision,2).players.isEmpty(),"empty chart exists without legacy fallback");
         check(Arrays.equals(raw,Files.readAllBytes(archive)),"original history byte-identical");
         JSONObject idle=d.refresh(false);check(idle.getInt("changed")==0&&idle.getInt("players")==1,"empty archives are cached without appearing on boards or triggering constant publication");
+        Files.write(folder.resolve(PlayerTitle.FILE),PlayerTitle.pack(qq,server,"rank:0"));
+        check(d.refresh(false).getInt("changed")==1,"title-only upload refreshes player snapshot without score uploads");
+        RankingData.Player titled=RankingSnapshot.read(Files.readAllBytes(total),server,revision,0).players.get(0);
+        check(titled.title.equals("小师妹")&&Math.abs(titled.rating-board.players.get(0).rating)<1e-12,"selected title does not change rating");
+        JSONObject songTitle=new JSONObject(new String(PlayerTitle.pack(qq,server,"sid:1"),StandardCharsets.UTF_8));
+        JSONArray unlocked=new JSONArray(scores.toString());unlocked.getJSONObject(0).put("accuracy_candidate",99.9);
+        check(PlayerTitle.resolve(songTitle,qq,server,unlocked,charts,12).equals(charts.getJSONObject(0).getString("title")),"song title unlock is checked using real accuracy");
+        check(PlayerTitle.resolve(songTitle,qq,server,scores,charts,12).equals("大师"),"locked song title falls back to actual rating title");
+        check(PlayerTitle.resolve(songTitle,qq,"other",unlocked,charts,12).equals("大师"),"another server cannot provide a title");
         Files.write(archive,new byte[]{1});d=new RankingDaemon(root,cat,state);JSONObject status=d.refresh(false);check(status.getInt("failed")==1,"damaged source flagged");check(RankingSnapshot.read(Files.readAllBytes(total),server,revision,0).players.size()==1,"restart retains last good player");
         byte[] snapshot=Files.readAllBytes(total);try{RankingSnapshot.read(snapshot,server,revision,1);throw new AssertionError("wrong chart accepted");}catch(java.io.IOException expected){}
         JSONObject bad=new JSONObject(new String(snapshot,StandardCharsets.UTF_8));bad.getJSONArray("players").put(bad.getJSONArray("players").get(0));try{RankingSnapshot.read(bad.toString().getBytes(StandardCharsets.UTF_8),server,revision,0);throw new AssertionError("duplicate accepted");}catch(java.io.IOException expected){}

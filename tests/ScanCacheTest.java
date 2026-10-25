@@ -33,6 +33,25 @@ public final class ScanCacheTest {
         ScanCache partial=new ScanCache(new JSONObject(),revision,cloud);partial.checked("done","stamp");
         ScanCache resumed=new ScanCache(partial.snapshot(revision,cloud,Arrays.asList("done","failed")),revision,cloud);
         check(resumed.unchanged("done","stamp")&&!resumed.unchanged("failed","stamp"),"interrupted scan retains completed files but retries unread failures");
+        chart.put("server_hash","hash");
+        ReplayScanCache individual=new ReplayScanCache(new JSONObject(),"server",charts,aliases,cloud);
+        individual.checked("one","stamp","md5","a|hash");individual.checked("unknown","stamp","unknown-hash","");
+        JSONObject individualSaved=individual.snapshot(Arrays.asList("one","unknown"));
+        JSONArray expanded=new JSONArray(charts.toString()).put(new JSONObject().put("cid",2).put("server_hash","new").put("title","New song"));
+        JSONObject extraAliases=new JSONObject(aliases.toString()).put("another",new JSONObject().put("cid",2).put("server_hash","new"));
+        ReplayScanCache individualNext=new ReplayScanCache(individualSaved,"server",expanded,extraAliases,cloud);
+        check(individualNext.unchanged("one","stamp")&&individualNext.unchanged("unknown","stamp"),"unrelated chart and alias additions do not reread existing or unknown replays");
+        check(!individualNext.unchanged("one","new-stamp"),"changed replay metadata still forces read");
+        check(!new ReplayScanCache(individualSaved,"server",expanded,extraAliases,new JSONArray().put(score("b"))).unchanged("one","stamp"),"only a replay whose own result disappeared is reread");
+        extraAliases.put("unknown-hash",new JSONObject().put("cid",2).put("server_hash","new"));
+        ReplayScanCache newlyMatched=new ReplayScanCache(individualSaved,"server",expanded,extraAliases,cloud);
+        check(!newlyMatched.unchanged("unknown","stamp")&&newlyMatched.unchanged("one","stamp"),"learning an unknown replay chart rereads that replay only");
+        check(!new ReplayScanCache(individualSaved,"other",expanded,extraAliases,cloud).unchanged("one","stamp"),"replay caches remain isolated by server");
+        ReplayScanCache bulk=new ReplayScanCache(new JSONObject(),"server",charts,aliases,cloud);List<String> bulkPaths=new ArrayList<>();
+        for(int i=0;i<2759;i++){String p="large/"+i;bulkPaths.add(p);bulk.checked(p,"100:1:1","md5","a|hash");}
+        JSONObject bulkSaved=bulk.snapshot(bulkPaths);ReplayScanCache bulkNext=new ReplayScanCache(bulkSaved,"server",expanded,extraAliases,cloud);int payloadReads=0;
+        for(String p:bulkPaths)if(!bulkNext.unchanged(p,"100:1:1"))payloadReads++;
+        check(payloadReads==0,"2759 unchanged replay payloads remain skipped after unrelated catalogue and alias changes");
         ScanCache chartCache=new ScanCache(new JSONObject(),revision,null);chartCache.checked("chart/song.mc","stamp");
         check(new ScanCache(chartCache.snapshot(revision,null,Collections.singletonList("chart/song.mc")),revision,null).unchanged("chart/song.mc","stamp"),"unchanged chart matching is persisted separately");
     }
