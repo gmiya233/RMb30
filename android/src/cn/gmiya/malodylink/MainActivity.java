@@ -168,6 +168,7 @@ public final class MainActivity extends Activity {
         long updated=engine.catalog.optLong("updated_at");server.addView(text("清单更新："+date(updated),12,MUTED,false));
         button(server,"更新谱库（默认账号）",false,()->runTask(()->DefaultCatalog.refresh(this,engine,true,this::message)));button(server,"导出匹配成绩 JSON",false,()->{Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/json").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"malody-link-scores.json");startActivityForResult(i,11);});
 
+        LinearLayout imports=settingsCard(columns[1]);imports.addView(text("群文件批量导入",18,INK,true));imports.addView(text("先在 QQ 批量下载，再在 App 中多选谱面包。",14,MUTED,false));button(imports,"QQ群文件下载路径",false,()->startActivity(new Intent(this,QqDownloadSettingsActivity.class)));button(imports,"选择和确认谱面包",true,()->startActivity(new Intent(this,ChartImportActivity.class)));
         LinearLayout about=settingsCard(columns[0]);about.addView(text("关于 Malody Link",18,INK,true));space(about,8);about.addView(text(appVersion()+" · O20 + N10\n仅收录当前服务器谱库成绩；预览参数不改写原始记录。",13,MUTED,false));button(about,"获取更新",false,()->startActivity(new Intent(this,UpdateActivity.class)));
         space(root,8);root.addView(text("QQ机器人尚未接入；成绩数值字段仍待核对。",12,MUTED,false));
     }

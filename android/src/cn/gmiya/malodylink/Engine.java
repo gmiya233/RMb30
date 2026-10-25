@@ -106,45 +106,49 @@ public final class Engine {
     }
     public String scan(Reader reader,Progress progress)throws Exception {
         List<String> localCharts=reader.list("chart");int verified=0,failed=0;JSONArray entries=charts();
+        ScanCache chartCache=new ScanCache(load("chart-index.json",new JSONObject()),ScanCache.revision(server,entries,aliases),null);
+        int chartCached=0;
         for(String path:localCharts){
           try {
+            String stamp=reader.fingerprint(path);
+            if(chartCache.unchanged(path,stamp)){chartCached++;continue;}
             String basename=path.substring(path.lastIndexOf('/')+1);List<JSONObject> candidates=new ArrayList<>();
             for(int i=0;i<entries.length();i++){JSONObject e=entries.getJSONObject(i);if(basename.equals(e.optString("mc_name")))candidates.add(e);}
             if(candidates.isEmpty())continue;
-            byte[] local=reader.file(path);String md5=ChartMatcher.md5(local);JSONObject existing=allowed(md5);if(existing!=null){cacheLocalJacket(reader,path,local,existing.optInt("cid"));verified++;continue;}
+            byte[] local=reader.file(path);String md5=ChartMatcher.md5(local);JSONObject existing=allowed(md5);if(existing!=null){cacheLocalJacket(reader,path,local,existing.optInt("cid"));verified++;chartCache.checked(path,stamp);continue;}
             progress.update("匹配谱库目录 "+(verified+1)+" · "+basename);
             JSONObject match=null;boolean ambiguous=false;
             for(JSONObject candidate:candidates){
                 if(ChartMatcher.catalogMatches(local,basename,candidate)){if(match!=null&&match.optInt("cid")!=candidate.optInt("cid")){ambiguous=true;break;}match=candidate;}
             }
             if(match!=null&&!ambiguous){aliases.put(md5,new JSONObject(match.toString()).put("verification","catalog_identity").put("local_md5",md5));cacheLocalJacket(reader,path,local,match.optInt("cid"));verified++;}
+            chartCache.checked(path,stamp);
           } catch(InternalAdb.TransportException disconnected) { throw disconnected; }
           catch(Exception unsupported) { failed++; }
         }
         save("aliases.json",aliases);
+        String revision=ScanCache.revision(server,entries,aliases);
+        save("chart-index.json",chartCache.snapshot(revision,null,localCharts));
         List<String> replays=reader.list("replay");Collections.sort(replays);
-        JSONObject index=load("replay-index.json",new JSONObject());
-        // Changes in either the catalogue, aliases, or stored scores invalidate skip decisions.
-        String revision=ChartMatcher.md5((server+ChartMatcher.canonical(charts())+ChartMatcher.canonical(aliases)).getBytes(StandardCharsets.UTF_8));
-        String scoreRevision=ChartMatcher.md5(scores.toString().getBytes(StandardCharsets.UTF_8));
-        if(!revision.equals(index.optString("revision"))||!scoreRevision.equals(index.optString("scores")))index=new JSONObject();
-        JSONObject files=index.optJSONObject("files");if(files==null)files=new JSONObject();
+        // Cloud merges may reorder/enrich records or add scores without changing checked files.
+        ScanCache replayCache=new ScanCache(load("replay-index.json",new JSONObject()),revision,scores);
         int imported=0,skipped=0,cached=0,invalid=0;
         try{
             for(int i=0;i<replays.size();i++){
                 String path=replays.get(i),stamp=reader.fingerprint(path);
-                progress.update("读取成绩 "+(i+1)+" / "+replays.size()+" · 已收录 "+imported+" 条");
-                if(!stamp.isEmpty()&&stamp.equals(files.optString(path))){cached++;continue;}
+                if(replayCache.unchanged(path,stamp)){cached++;continue;}
+                progress.update("读取新增或变化的回放 "+(i+1)+" / "+replays.size()+" · 已跳过未变化 "+cached+" 份");
                 byte[] raw=reader.file(path); // Transport/storage failures must never be treated as malformed replays.
                 try{if(importReplay(raw))imported++;else skipped++;}
-                catch(InvalidReplayException malformed){invalid++;continue;}
-                if(!stamp.isEmpty())files.put(path,stamp);
+                catch(InvalidReplayException malformed){invalid++;}
+                // Stable malformed/unknown/duplicate files also need a skip decision.
+                replayCache.checked(path,stamp);
             }
         }finally{
-            JSONObject present=new JSONObject();for(String path:replays)if(files.has(path))present.put(path,files.get(path));
-            save("replay-index.json",new JSONObject().put("revision",revision).put("scores",ChartMatcher.md5(scores.toString().getBytes(StandardCharsets.UTF_8))).put("files",present));
+            save("replay-index.json",replayCache.snapshot(revision,scores,replays));
         }
         return "同步完成：收录 "+imported+" 条，已检查未变化 "+cached+" 份，未收录或重复 "+skipped+" 份。"+
+            (chartCached>0?" 已跳过未变化谱面 "+chartCached+" 张。":"")+
             (invalid>0?" "+invalid+" 份回放无法解析，已跳过。":"")+(failed>0?" "+failed+" 张谱面未能识别。":"");
     }
     public static final class InvalidReplayException extends IOException {

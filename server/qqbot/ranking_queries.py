@@ -43,6 +43,7 @@ class Queries:
     HELP = ('小师妹 · 排行查询\n'
             '绑定 QQ号：设置本群默认查询QQ\n'
             'b30：返回已绑定QQ的O20+N10图片\n'
+            'rating：查看 rating 计算规则\n'
             '我的绑定 / 解绑：查看或解除绑定\n'
             '总榜 [页码]：综合 rating，每页10人\n'
             '查排名 QQ号：查询玩家排名\n'
@@ -51,6 +52,29 @@ class Queries:
             '单曲榜 歌名：先搜索，再选择谱面ID\n'
             '例：单曲榜 604342\n'
             '请在群内 @我 后发送命令。')
+
+    RATING_HELP = (
+        '小师妹来讲讲 rating 怎么算～\n'
+        '这是本服的换算 rating，和 Malody 官方 MM 不同。\n\n'
+        '① 单曲 rating = 定级 × 准度系数 × 判定倍率\n'
+        '判定倍率：A判 0.78，B判 0.85，C判 1.00，D判 1.10，E判 1.20。\n'
+        '设准度为 P（例如 99.6%，P 就填 99.6）：\n'
+        'P < 99.5：系数 = (P ÷ 99.5)²\n'
+        '99.5 ≤ P < 99.8：系数 = 1 + (P − 99.5) ÷ 30\n'
+        'P ≥ 99.8：系数固定为 1.01。\n'
+        '例如：13级、C判、99.5% = 13.0000；99.8%及以上 = 13.1300。\n\n'
+        '② 综合 rating =（O20 的单曲 rating 总和 + N10 的单曲 rating 总和）÷ 30\n'
+        'O20：普通歌曲中最高的20首；N10：服务器标为新歌（promote）的歌曲中最高的10首。\n'
+        '同一首歌的不同难度只取最高的一条；同歌只要有谱面属于新歌，就归入 N10，不重复进 O20。'
+        '不足20首或10首的空位按0算，所以先打满两栏也能提升总 rating 哦！\n\n'
+        '③ 定级口径\n'
+        '普通谱面：原等级低于16时直接使用；16→8，17–18→9，19–20→10，'
+        '21–23→11，24–26→12，27–29→13，30–32→14，33–35→15。\n'
+        '难度名含 SC 时优先使用：SC1–4→12，SC5–13→13，SC14及以上→15。'
+        '未提供有效定级或判定无法识别的成绩不计入。\n'
+        '排行榜使用上述默认倍率；App里的模拟设置不改变云端排行。\n'
+        '在 App 上传成绩后，发送 b30 就能查看已绑定QQ的成绩图～'
+    )
 
     def __init__(self, root, catalogue, clock=time.time):
         self.root, self.catalogue_file = Path(root), Path(catalogue)
@@ -161,6 +185,8 @@ class Queries:
         try:
             if command in ('', '帮助', 'help', '菜单'):
                 return self.HELP
+            if command.casefold() in ('rating', 'rating说明', 'rating规则'):
+                return self.RATING_HELP
             if command in ('总榜', 'rt榜', '战力榜'):
                 rows, stamp = self.board()
                 selected, page = self.page(rows, arg or '1')

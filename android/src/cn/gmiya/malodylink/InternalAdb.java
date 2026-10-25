@@ -14,7 +14,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import javax.security.auth.x500.X500Principal;
 
-/** On-device connection. Its application-facing reader exposes only the Malody allowlist. */
+/** On-device connection. Separate fixed read-only scopes for Malody and QQ package downloads. */
 public final class InternalAdb extends AbsAdbConnectionManager {
     private static InternalAdb instance;
     private final PrivateKey key;
@@ -63,7 +63,16 @@ public final class InternalAdb extends AbsAdbConnectionManager {
     private static final class ReadFailure extends IOException {
         ReadFailure(String message){super(message);}
     }
+    private static final class CommandResult {
+        final byte[] stdout,stderr;final int exitCode;
+        CommandResult(byte[] out,byte[] err,int code){stdout=out;stderr=err;exitCode=code;}
+    }
     private byte[] command(String cmd,int limit)throws Exception {
+        CommandResult result=commandResult(cmd,limit);
+        if(result.exitCode!=0)throw new ReadFailure("本机文件读取失败："+new String(result.stderr,StandardCharsets.UTF_8));
+        return result.stdout;
+    }
+    private CommandResult commandResult(String cmd,int limit)throws Exception {
         AdbConnection connection=getAdbConnection();
         if(connection==null||!isConnected())throw new TransportException("本机连接已断开",null);
         java.util.concurrent.atomic.AtomicBoolean timedOut=new java.util.concurrent.atomic.AtomicBoolean();
@@ -78,8 +87,8 @@ public final class InternalAdb extends AbsAdbConnectionManager {
                 if(channel==1){if(stdout.size()+payload.length>limit)throw new ReadFailure("文件超出读取上限");stdout.write(payload);}
                 else if(channel==2){if(stderr.size()+payload.length>8192)throw new ReadFailure("文件读取错误信息过长");stderr.write(payload);}
                 else if(channel==3){
-                    if(payload.length!=1||payload[0]!=0)throw new ReadFailure("Malody文件读取失败："+new String(stderr.toByteArray(),StandardCharsets.UTF_8));
-                    return stdout.toByteArray();
+                    if(payload.length!=1)throw new ReadFailure("文件读取结束标记无效");
+                    return new CommandResult(stdout.toByteArray(),stderr.toByteArray(),payload[0]&255);
                 }else throw new ReadFailure("无法识别的读取响应");
             }
         }catch(ReadFailure e){throw e;}
@@ -87,6 +96,35 @@ public final class InternalAdb extends AbsAdbConnectionManager {
         finally{watchdog.cancel(false);}
     }
     private static byte[] exact(InputStream in,int size)throws IOException {byte[] b=new byte[size];int offset=0;while(offset<size){int n=in.read(b,offset,size-offset);if(n<0)throw new EOFException("读取响应不完整");offset+=n;}return b;}
+    public QqDownloadPolicy.Listing qqPackages(String directory)throws Exception {
+        String root=QqDownloadPolicy.root(directory),q=quote(root);
+        String cmd="[ -d "+q+" ] && [ -r "+q+" ] && [ -x "+q+" ] || exit 3; find "+q+
+            " -maxdepth 6 \\( -type d \\( -name '.trooptmp' -o -name '.troopthumb' \\) -prune \\) -o \\( -type f -iname '*.mcz' -exec stat -c '%s:%Y:%Z:%n' {} + \\)";
+        CommandResult result=commandResult(cmd,2000000);
+        return QqDownloadPolicy.listing(new String(result.stdout,StandardCharsets.UTF_8),new String(result.stderr,StandardCharsets.UTF_8),result.exitCode,root);
+    }
+    public boolean qqDirectoryExists(String directory)throws Exception {String q=quote(QqDownloadPolicy.root(directory));return new String(command("if [ -d "+q+" ]; then printf yes; fi",16),StandardCharsets.US_ASCII).equals("yes");}
+    /** Called only after the player's explicit cleanup confirmation. Never recursive. */
+    public void removeQQPackage(QqDownloadPolicy.Entry source)throws Exception {
+        String path=QqDownloadPolicy.file(source.path);if(source.stamp==null||!source.stamp.matches("[0-9]+:[0-9]+:[0-9]+"))throw new IOException("文件信息无效，请刷新目录");
+        StringBuilder roots=new StringBuilder();for(String root:QqDownloadPolicy.ROOTS){if(roots.length()>0)roots.append('|');roots.append(quote(root)).append("/*");}
+        String p=quote(path);String cmd="r=$(readlink -f "+p+") || exit 1; [ \"$r\" = "+p+" ] || exit 1; case \"$r\" in "+roots+") ;; *) exit 1;; esac; [ -f \"$r\" ] && [ ! -L \"$r\" ] || exit 1; [ \"$(stat -c '%s:%Y:%Z' \"$r\")\" = "+quote(source.stamp)+" ] || exit 1; rm -- \"$r\"";
+        command(cmd,64);
+    }
+    public void copyQQPackage(QqDownloadPolicy.Entry source,File target)throws Exception {
+        String path=QqDownloadPolicy.file(source.path);if(source.size<=0||source.size>ChartPackage.MAX_PACKAGE_BYTES||!source.stamp.matches("[0-9]+:[0-9]+:[0-9]+"))throw new IOException("文件为空、过大或信息无效");
+        StringBuilder patterns=new StringBuilder();for(String root:QqDownloadPolicy.ROOTS){if(patterns.length()>0)patterns.append('|');patterns.append(quote(root)).append("/*");}
+        String cmd="r=$(readlink -f "+quote(path)+") || exit 1; case \"$r\" in "+patterns+") ;; *) exit 1;; esac; [ \"$(stat -c '%s:%Y:%Z' \"$r\")\" = "+quote(source.stamp)+" ] || exit 1; cat \"$r\" || exit 1; [ \"$(stat -c '%s:%Y:%Z' \"$r\")\" = "+quote(source.stamp)+" ]";
+        AdbConnection connection=getAdbConnection();if(connection==null||!isConnected())throw new TransportException("本机读取已断开",null);
+        ScheduledFuture<?> watchdog=timer.schedule(()->{try{connection.close();}catch(Exception ignored){}},120,TimeUnit.SECONDS);boolean complete=false;
+        try(AdbStream stream=openStream("shell,v2,raw:"+cmd);InputStream in=stream.openInputStream();OutputStream out=new BufferedOutputStream(new FileOutputStream(target))){
+            long total=0;for(;;){if(Thread.currentThread().isInterrupted())throw new InterruptedIOException("已停止复制");int channel=in.read();if(channel<0)throw new EOFException("文件读取未结束");byte[] header=exact(in,4);long length=0;for(int i=0;i<4;i++)length|=(long)(header[i]&255)<<(8*i);if(length>33554432)throw new IOException("读取响应过大");byte[] bytes=exact(in,(int)length);
+                if(channel==1){total+=length;if(total>source.size||target.getUsableSpace()<4L*1024*1024)throw new IOException("文件大小已变化或存储空间不足");out.write(bytes);}
+                else if(channel==3){if(bytes.length!=1||bytes[0]!=0||total!=source.size)throw new IOException("QQ 文件读取失败或下载尚未完成，请刷新后重试");complete=true;break;}
+                else if(channel!=2)throw new IOException("读取响应无效");
+            }
+        }finally{watchdog.cancel(false);if(!complete)target.delete();}
+    }
     public Engine.Reader reader(){return new Engine.Reader(){
         private final Map<String,String> stamps=new HashMap<>();
         public String fingerprint(String path){return stamps.getOrDefault(path, "");}

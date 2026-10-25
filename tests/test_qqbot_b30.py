@@ -99,6 +99,31 @@ class B30Tests(unittest.TestCase):
         supplement([chart], self.root / 'source', self.root / 'unsafe', atomic)
         self.assertNotIn('artwork_fallbacks', chart)
 
+    def test_database_paths_generate_thumbnails_and_broken_cover_uses_background(self):
+        from PIL import Image
+        from artwork_fallback import supplement
+        from publish_catalogue import atomic
+        import hashlib
+        folder = self.root / 'source' / 'promote' / 'song'
+        folder.mkdir(parents=True)
+        Image.new('RGB', (60, 60), (30, 190, 60)).save(folder / 'bg.jpg')
+        # This chart has nonempty database fields, but no pre-existing thumbnail or MC file.
+        chart = dict(cid=1, path='promote/song', mc_name='missing.mc',
+                     cover='promote/song/missing.jpg', background='promote/song/BG.JPG')
+        supplement([chart], self.root / 'source', self.root / 'thumbs', atomic)
+        digest = hashlib.sha256(b'promote/song/BG.JPG').hexdigest()
+        self.assertEqual(chart['artwork_fallbacks'], [digest])
+        self.assertTrue((self.root / 'thumbs' / (digest + '.jpg')).is_file())
+        # Existing but unusable DB paths must also fall back to independent MC candidates.
+        (folder / '1.mc').write_text(json.dumps({'meta': {'cover': 'bad.jpg', 'background': 'bg.jpg'}}))
+        fallback = dict(cid=2, path='promote/song', mc_name='1.mc', cover='missing.jpg')
+        supplement([fallback], self.root / 'source', self.root / 'thumbs', atomic)
+        self.assertEqual(fallback['artwork_fallbacks'], [hashlib.sha256(b'promote/song/bg.jpg').hexdigest()])
+        # Bad or escaping covers never prevent a valid independent background.
+        chart['cover'] = '../outside.jpg'
+        supplement([chart], self.root / 'source', self.root / 'thumbs', atomic)
+        self.assertEqual(chart['artwork_fallbacks'], [digest])
+
     def test_b30_unbound_missing_cloud_and_render(self):
         now, revision = 1792700000, 'a'*64
         chart = dict(cid=1, sid=1, title='B30测试曲', version='SC9', level=13, promote=1)

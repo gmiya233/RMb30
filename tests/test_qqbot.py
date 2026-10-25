@@ -93,6 +93,18 @@ class BotTests(unittest.TestCase):
         self.assertFalse(gate.accept('group', 'other', '3'))
         self.assertTrue(gate.accept('other-group', 'other', '4'))
 
+    def test_rating_help_works_without_catalogue_or_player_binding(self):
+        query = Queries(self.root / 'missing', self.root / 'missing-catalogue.json')
+        for command in ('rating', '<@!123> /rating', 'RATING', 'Rating', 'rating规则'):
+            reply = query.execute(command)
+            self.assertEqual(reply, Queries.RATING_HELP)
+        for part in ('0.78', '0.85', '1.10', '1.20', '(P ÷ 99.5)²',
+                     '(P − 99.5) ÷ 30', '1.01', '13.1300', '÷ 30',
+                     '空位按0算', '只取最高的一条', 'promote', 'SC1–4→12', '模拟设置不改变云端排行'):
+            self.assertIn(part, reply)
+        self.assertLess(len(reply), 1800)
+        self.assertIn('rating：', query.execute('帮助'))
+
     def test_hidden_creators_excluded_before_search_count_and_limit(self):
         names = ['阿峦', '夜語', 'ALWAYS_OVER', 'Kevin.X', '節奏大師譜面團隊',
                  'imddesigner', 'ＡＬＷＡＹＳＯＶＥＲ', '合作 / 藍貓', 'GM1YA']
