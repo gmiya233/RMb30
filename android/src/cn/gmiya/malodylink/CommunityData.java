@@ -15,6 +15,14 @@ public final class CommunityData {
     public static String title(String id){if(id.equals("creator_hot_all"))return "谱师热度榜";for(int i=0;i<IDS.length;i++)if(IDS[i].equals(id))return TITLES[i];throw new IllegalArgumentException("无效榜单");}
     public static boolean good(String id){return id.endsWith("_good");}
     public static final class Boards {public JSONObject doc;public boolean cached;public JSONArray rows(String id)throws Exception{title(id);return doc.getJSONObject("boards").getJSONArray(id);}}
+    public interface CatalogueRefresh {String refresh()throws Exception;}
+    public static Boards boardsWithRefresh(byte[] bytes,String server,String revision,CatalogueRefresh refresh)throws Exception {
+        if(bytes.length>MAX_BYTES)throw new IOException("社区摘要超过容量");JSONObject header=new JSONObject(new String(bytes,StandardCharsets.UTF_8));
+        String published=header.optString("revision");
+        if(header.optInt("schema")!=1||!server.equals(header.optString("server"))||!published.matches("[a-f0-9]{64}"))throw new IOException("社区摘要来源无效");
+        if(!published.equals(revision))revision=refresh.refresh();
+        return boards(bytes,server,revision);
+    }
     private static JSONObject document(byte[] bytes,String server,String revision)throws Exception {
         if(bytes.length>MAX_BYTES)throw new IOException("社区摘要超过容量");JSONObject doc=new JSONObject(new String(bytes,StandardCharsets.UTF_8));
         if(doc.optInt("schema")!=1||!server.equals(doc.optString("server"))||!revision.equals(doc.optString("revision")))throw new IOException("社区摘要与当前谱库不匹配");
