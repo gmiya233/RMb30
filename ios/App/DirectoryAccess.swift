@@ -38,6 +38,18 @@ struct LocalState: Codable {
     var nickname = ""
     var title = ""
     var avatar: Data? = nil
+    var replayJournal: [String: ReplayReceipt] = [:]
+    enum CodingKeys: String, CodingKey { case records, journal, nickname, title, avatar, replayJournal }
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        records = try c.decode([ScoreRecord].self, forKey: .records)
+        journal = try c.decodeIfPresent([String: String].self, forKey: .journal) ?? [:]
+        nickname = try c.decodeIfPresent(String.self, forKey: .nickname) ?? ""
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
+        avatar = try c.decodeIfPresent(Data.self, forKey: .avatar)
+        replayJournal = try c.decodeIfPresent([String: ReplayReceipt].self, forKey: .replayJournal) ?? [:]
+    }
 }
 
 actor StateStore {
@@ -141,30 +153,43 @@ actor DirectoryImporter {
             } catch { report.invalid += 1 }
         }
         for hash in ambiguous { aliases.removeValue(forKey: hash) }
-        let revision = catalogue.revision()
         var state = previous; state.records = catalogue.filtered(state.records)
+        let bindings = aliases.mapValues { "\(catalogue.server)|\($0.chart.cid):\($0.chart.serverHash)" }
+        var receiptRecords = Set(state.records.map { $0.id + "|" + $0.serverHash })
         var known = Set(state.records.map(\.id)), newRecords: [ScoreRecord] = []
+        // Namespaced by root as well as relative path; switching folders cannot reuse unrelated stamps.
+        let scope = Digests.sha256(Data(root.standardizedFileURL.path.utf8))
+        var receipts: [String: ReplayReceipt] = [:]
         for (index, file) in replayFiles.enumerated() {
             try Task.checkCancellation()
             if index % 10 == 0 { await progress("读取成绩 \(index + 1) / \(replayFiles.count)") }
-            let key = String(file.path.dropFirst(root.path.count))
+            let key = scope + ":" + String(file.path.dropFirst(root.path.count))
             do {
-                let signature = try stamp(file, revision: revision)
-                if state.journal[key] == signature { report.unchanged += 1; continue }
+                let signature = try stamp(file, revision: "replay-v2")
+                if let receipt = state.replayJournal[key], receipt.unchanged(stamp: signature, bindings: bindings, records: receiptRecords) {
+                    receipts[key] = receipt; report.unchanged += 1; continue
+                }
                 let data = try read(file, limit: 32 * 1024 * 1024)
-                guard signature == (try stamp(file, revision: revision)) else { throw MalodyError.invalid("回放正在更新") }
+                guard signature == (try stamp(file, revision: "replay-v2")) else { throw MalodyError.invalid("回放正在更新") }
                 let header = try ReplayHeader.read(data)
-                guard let match = aliases[header.hash] else { report.excluded += 1; state.journal[key] = signature; continue }
+                guard let match = aliases[header.hash] else {
+                    report.excluded += 1
+                    receipts[key] = ReplayReceipt(stamp: signature, hash: header.hash, binding: "", record: "")
+                    continue
+                }
                 let record = ScoreRecord(chart: match.chart, replay: data, header: header)
                 guard record.valid else { throw MalodyError.invalid("回放无法转换为有效成绩") }
                 if known.insert(record.id).inserted {
                     newRecords.append(record); report.imported += 1
                     if let art = artFiles[record.cid] { ThumbnailCache.copy(from: art.0, names: art.1, chart: match.chart, permittedRoot: chartRoot) }
                 } else { report.unchanged += 1 }
-                state.journal[key] = signature
+                let recordKey = record.id + "|" + record.serverHash
+                receiptRecords.insert(recordKey)
+                receipts[key] = ReplayReceipt(stamp: signature, hash: header.hash, binding: bindings[header.hash] ?? "", record: recordKey)
             } catch { report.invalid += 1 }
         }
         state.records = try ScoreRecord.merge(local: state.records, remote: newRecords, catalogue: catalogue)
+        state.replayJournal = receipts; state.journal = [:]
         return ImportOutput(state: state, report: report)
     }
 }

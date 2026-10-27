@@ -46,6 +46,7 @@ actor CatalogueStore {
         let catalogue = try JSONCoding.decode(Catalogue.self, data)
         try data.write(to: cache, options: .atomic)
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "catalogue-updated")
+        UserDefaults.standard.set(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "", forKey: "catalogue-app-version")
         return catalogue
     }
 }

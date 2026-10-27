@@ -25,11 +25,14 @@ import MalodyCore
         didSet { if let data = try? JSONCoding.encode(preview) { UserDefaults.standard.set(data, forKey: "rating-preview") } }
     }
     @Published var showingPreview = false
+    @Published var showingPackages = false
+    @Published var incomingPackages: [URL] = []
     var previewBoard: ScoreBoard { showingPreview ? ScoreBoard(records: state.records, catalogue: catalogue, preview: preview) : board }
     private let store = StateStore(), importer = DirectoryImporter(), catalogues = CatalogueStore()
     var cloud: CloudGateway?
     private var task: Task<Void, Never>?
     private var rankRequest = 0
+    private var revisionChecked = Date.distantPast
     @Published private(set) var loadedRankingCID: Int?
 
     init() { UserDefaults.standard.register(defaults: ["auto-cloud": true]); Task { await startup() } }
@@ -38,22 +41,25 @@ import MalodyCore
         return state.records.max(by: { $0.playedAt < $1.playedAt })?.player ?? "PLAYER"
     }
     var unlockedTitles: [String] {
-        var names = ["小师妹"]
-        for (threshold, title) in [(10.0, "萌新"), (11.0, "高手"), (12.0, "大师"), (13.0, "龙币")] where board.rating >= threshold { names.append(title) }
-        let charts = catalogue.byCID
-        let songs = Set(catalogue.filtered(state.records).filter { $0.accuracy > 99.8 }.compactMap { charts[$0.cid]?.title }).sorted()
-        names.append(contentsOf: songs.filter { !names.contains($0) }); return names
+        titleOptions.filter { !$0.key.isEmpty }.map(\.name)
     }
+    var titleOptions: [(key: String, name: String)] { PlayerTitle.choices(records: state.records, catalogue: catalogue) }
+    var selectedTitleKey: String { PlayerTitle.key(for: state.title, records: state.records, catalogue: catalogue) }
     var playerTitle: String {
-        if !state.title.isEmpty && unlockedTitles.contains(state.title) { return state.title }
-        return board.rating >= 13 ? "龙币" : board.rating >= 12 ? "大师" : board.rating >= 11 ? "高手" : board.rating >= 10 ? "萌新" : "小师妹"
+        PlayerTitle.name(for: state.title, records: state.records, catalogue: catalogue)
+    }
+    func receivePackage(_ url: URL) {
+        guard ChartPackage.supported(url.lastPathComponent) else { error = "请选择 MCZ / MCB / ZIP 谱面包"; return }
+        incomingPackages.append(url); showingPackages = true
     }
     private func startup() async {
         do {
             #if DEBUG
             if let fixture = try UITestFixture.prepare() {
                 catalogue = fixture.0; try DirectoryBookmark.save(fixture.1); folderName = fixture.1.lastPathComponent
-                state = try await store.load(qq); rebuild(); ready = true; status = "测试目录已准备"; return
+                state = try await store.load(qq); rebuild(); ready = true; status = "测试目录已准备"
+                if ProcessInfo.processInfo.environment["MALODY_PACKAGE_UI_TESTING"] == "1" { receivePackage(fixture.1.appendingPathComponent("synthetic.mcz")) }
+                return
             }
             #endif
             catalogue = try await catalogues.load()
@@ -76,14 +82,20 @@ import MalodyCore
     func forgetFolder() {
         guard !busy else { return }; DirectoryBookmark.forget(); folderName = ""; status = "已解除本机目录关联，成绩记录保留"
     }
-    private func refreshIfNeeded() async {
+    private func refreshIfNeeded(checkRevision: Bool = false) async {
         #if DEBUG
         if ProcessInfo.processInfo.environment["MALODY_UI_TESTING"] == "1" { return }
         #endif
         let updated = UserDefaults.standard.double(forKey: "catalogue-updated")
-        if Date().timeIntervalSince1970 - updated >= 6 * 3600 {
+        var changed = false
+        if checkRevision, Date().timeIntervalSince(revisionChecked) >= 60, let cloud {
+            revisionChecked = Date()
+            if let revision = try? await cloud.communityRevision() { changed = revision != catalogue.revision() }
+        }
+        let appVersion = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+        if changed || UserDefaults.standard.string(forKey: "catalogue-app-version") != appVersion || Date().timeIntervalSince1970 - updated >= 6 * 3600 {
             status = "正在更新谱库…"
-            do { catalogue = try await catalogues.refresh(); if let cloud, let enriched = try? await cloud.keys(catalogue: catalogue) { catalogue = enriched } }
+            do { catalogue = try await catalogues.refresh(); if let cloud, let enriched = try? await cloud.keys(catalogue: catalogue) { catalogue = enriched }; rebuild() }
             catch { status = "谱库暂未更新，继续按本地目录筛选" }
         }
     }
@@ -92,7 +104,7 @@ import MalodyCore
         task = Task {
             defer { busy = false; task = nil }
             do {
-                let root = try DirectoryBookmark.resolve(); await refreshIfNeeded()
+                let root = try DirectoryBookmark.resolve(); await refreshIfNeeded(checkRevision: true)
                 let previous = state, profile = qq, currentCatalogue = catalogue
                 let output = try await importer.scan(root: root, catalogue: currentCatalogue, previous: previous) { [weak self] text in
                     await self?.setProgress(text)
@@ -134,8 +146,15 @@ import MalodyCore
     }
     func saveProfile(name: String, title: String) async {
         guard !busy, ready else { return }
-        var next = state; next.nickname = String(name.prefix(40)); next.title = title
-        do { try await store.save(next, qq: qq); state = next } catch { self.error = error.localizedDescription }
+        busy = true; defer { busy = false }
+        var next = state; next.nickname = String(name.prefix(40)); next.title = PlayerTitle.key(for: title, records: state.records, catalogue: catalogue)
+        do {
+            try await store.save(next, qq: qq); state = next; status = "名片已保存"
+            if !qq.isEmpty, let cloud {
+                do { try await cloud.publishTitle(qq: qq, selection: next.title, records: next.records, catalogue: catalogue); status = "名片已保存，称号已同步到服务器" }
+                catch { status = "名片已保存，称号将在下次上传时重试" }
+            }
+        } catch { self.error = error.localizedDescription }
     }
     func saveAvatar(_ bytes: Data?) async {
         guard !busy, ready, bytes == nil || bytes!.count <= 2_000_000 else { return }
@@ -150,6 +169,8 @@ import MalodyCore
         try await store.save(next, qq: profile); state = next; rebuild()
         status = upload ? "成绩已上传到服务器，排行榜会随后刷新" : "云端成绩已恢复"
         if upload {
+            do { try await cloud.publishTitle(qq: profile, selection: state.title, records: merged, catalogue: catalogue) }
+            catch { status += "；称号同步未完成，下次上传将重试" }
             do { try await cloud.publishIndex(qq: profile, records: merged, catalogue: catalogue) }
             catch { status = "成绩已上传；兼容排行榜索引暂未更新，可稍后再同步" }
         }
@@ -162,7 +183,7 @@ import MalodyCore
         task = Task {
             defer { busy = false; task = nil }
             do {
-                await refreshIfNeeded()
+                await refreshIfNeeded(checkRevision: true)
                 try await mergeCloud(upload: upload)
             } catch is CancellationError { status = "同步已停止，已保存的成绩保留" }
             catch { self.error = error.localizedDescription; status = "云端同步未完成，本地成绩保留" }
@@ -189,6 +210,7 @@ import MalodyCore
     }
     func loadCommunity() async {
         guard let cloud, ready else { return }
+        if !busy { busy = true; await refreshIfNeeded(checkRevision: true); busy = false }
         do { let result = try await cloud.community(catalogue: catalogue); communityBoards = result.0; communityStatus = result.1 ? "离线缓存 · 下拉重试" : "更新于 " + result.0.updated.formatted(date: .omitted, time: .shortened) }
         catch { communityStatus = "社区榜单暂不可用，可下拉重试" }
     }
@@ -215,7 +237,7 @@ import MalodyCore
         try? bytes.write(to: path, options: .atomic); return bytes
     }
     func diagnosticURL() throws -> URL {
-        var report: [String: Any] = ["app_version": "0.2.1-ios", "system": "iOS", "chart_count": catalogue.charts.count,
+        var report: [String: Any] = ["app_version": "0.3.0-ios", "system": "iOS", "chart_count": catalogue.charts.count,
                                       "record_count": state.records.count, "directory_selected": !folderName.isEmpty,
                                       "catalogue_revision": catalogue.revision(), "created_at": ISO8601DateFormatter().string(from: Date())]
         if let lastImport { report["last_import"] = try JSONSerialization.jsonObject(with: JSONCoding.encode(lastImport)) }

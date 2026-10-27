@@ -28,6 +28,7 @@ struct SettingsPage: View {
                     Button("选择 Malody V 文件夹") { chooseFolder = true }.buttonStyle(.borderedProminent).frame(minHeight: 44)
                 }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: typeSize.isAccessibilitySize ? 1 : 2), alignment: .leading, spacing: 12) {
+                    action("批量导谱 / QQ 曲包", icon: "square.stack.3d.up") { model.showingPackages = true }
                     action("同步本机成绩", icon: "arrow.triangle.2.circlepath") { model.importScores() }
                     action("解除目录关联", icon: "folder.badge.minus") { model.forgetFolder() }
                     action("上传并合并云端", icon: "icloud.and.arrow.up") { model.syncCloud(upload: true) }
@@ -46,13 +47,13 @@ struct SettingsPage: View {
                     Text("本地名片").font(.headline)
                     HStack { PlayerAvatar(data: model.state.avatar, side: 64); PhotosPicker(selection: $photo, matching: .images) { Label("选择头像", systemImage: "photo").frame(minHeight: 44) }; if model.state.avatar != nil { Button("移除") { Task { await model.saveAvatar(nil) } } } }
                     TextField("昵称", text: $name).textFieldStyle(.roundedBorder).accessibilityLabel("本地昵称")
-                    Picker("称号", selection: $title) { Text("自动选择").tag(""); ForEach(model.unlockedTitles, id: \.self) { Text($0).tag($0) } }
+                    Picker("称号", selection: $title) { ForEach(model.titleOptions, id: \.key) { option in Text(option.name).tag(option.key) } }
                     Button("保存本地名片") { Task { await model.saveProfile(name: name, title: title) } }.frame(minHeight: 44)
-                    Text("头像保存在本机；称号按实际成绩解锁。").font(.caption).foregroundStyle(.secondary)
+                    Text("头像保存在本机；称号按实际成绩解锁，绑定 QQ 后同步到云端及机器人 B30。").font(.caption).foregroundStyle(.secondary)
                 }
                 Card {
                     Text("关于").font(.headline)
-                    Text("Malody Link · iOS 0.2.1").font(.subheadline)
+                    Text("Malody Link · iOS 0.3.0").font(.subheadline)
                     Button { Task { await checkUpdate() } } label: { Label(checking ? "检查中…" : "获取更新", systemImage: "arrow.down.app").frame(minHeight: 44) }.disabled(checking)
                     Text(updateStatus.isEmpty ? "iOS 包需自行签名安装，更新会打开 GitHub 发布页。" : updateStatus).font(.caption).foregroundStyle(.secondary)
                     Button("分享读取诊断") { share { try model.diagnosticURL() } }.frame(minHeight: 44)
@@ -61,7 +62,7 @@ struct SettingsPage: View {
             }.padding(18).frame(maxWidth: 820).frame(maxWidth: .infinity)
         }.navigationTitle("设置").scrollDismissesKeyboard(.interactively)
         .disabled(model.busy || !model.ready)
-        .onAppear { qq = model.qq; name = model.state.nickname; title = model.state.title }
+        .onAppear { qq = model.qq; name = model.state.nickname; title = model.selectedTitleKey }
         .onChange(of: model.qq) { qq = $0 }
         .onChange(of: photo) { selected in Task { if let data = try? await selected?.loadTransferable(type: Data.self), let image = UIImage(data: data) {
             let size = CGSize(width: 384, height: 384)
@@ -83,7 +84,7 @@ struct SettingsPage: View {
             guard let releases = try JSONSerialization.jsonObject(with: bytes) as? [[String: Any]], let release = releases.first(where: { ($0["tag_name"] as? String ?? "").hasPrefix("ios-v") && $0["draft"] as? Bool != true }),
                   let link = release["html_url"] as? String, let target = URL(string: link), target.scheme == "https", target.host == "github.com", target.path.hasPrefix("/gmiya233/RMb30/releases/") else { throw MalodyError.invalid("尚无可用的 iOS 发布包") }
             let tag = release["tag_name"] as? String ?? ""
-            let latest = String(tag.dropFirst(5)), current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.2.1"
+            let latest = String(tag.dropFirst(5)), current = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.3.0"
             guard latest.compare(current, options: .numeric) == .orderedDescending else { updateStatus = "当前版本 " + current + " 已是最新；最新公开发布为 " + latest; return }
             updateStatus = "最新发布：" + tag + "，请在发布页下载并自行签名。"
             openURL(target)

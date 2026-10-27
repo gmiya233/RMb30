@@ -2,7 +2,7 @@ import SwiftUI
 
 @main struct MalodyLinkApp: App {
     @StateObject private var model = AppModel()
-    var body: some Scene { WindowGroup { RootView().environmentObject(model).tint(Palette.accent).preferredColorScheme(.light) } }
+    var body: some Scene { WindowGroup { RootView().environmentObject(model).tint(Palette.accent).preferredColorScheme(.light).onOpenURL { model.receivePackage($0) } } }
 }
 
 enum Palette {

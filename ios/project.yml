@@ -26,8 +26,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Malody Link
-        CFBundleShortVersionString: '0.2.1'
-        CFBundleVersion: '3'
+        CFBundleShortVersionString: '0.3.0'
+        CFBundleVersion: '4'
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIRequiresFullScreen: false
@@ -38,6 +38,22 @@ targets:
         NSPhotoLibraryAddUsageDescription: 将你生成的 B30 成绩图保存到照片。
         UIFileSharingEnabled: false
         LSSupportsOpeningDocumentsInPlace: true
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Malody chart package
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [cn.gmiya.malodylink.mcz, cn.gmiya.malodylink.mcb, public.zip-archive]
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: cn.gmiya.malodylink.mcz
+            UTTypeDescription: Malody chart package
+            UTTypeConformsTo: [public.zip-archive]
+            UTTypeTagSpecification:
+              public.filename-extension: [mcz]
+          - UTTypeIdentifier: cn.gmiya.malodylink.mcb
+            UTTypeDescription: Malody batch package
+            UTTypeConformsTo: [public.zip-archive]
+            UTTypeTagSpecification:
+              public.filename-extension: [mcb]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: cn.gmiya.malodylink.ios

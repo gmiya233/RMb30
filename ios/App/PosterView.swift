@@ -105,7 +105,7 @@ struct B30Page: View {
             .sheet(isPresented: $sharing) { if let image { ShareSheet(items: [image]) } }
             .fullScreenCover(isPresented: $zooming) { NavigationStack { if let image { ZoomImage(image: image).background(.black).ignoresSafeArea(edges: .bottom).toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { zooming = false } } } } } }
             .sheet(isPresented: $choosingTitle) {
-                NavigationStack { List { Button("自动选择") { Task { await model.saveProfile(name: model.state.nickname, title: ""); choosingTitle = false } }; ForEach(model.unlockedTitles, id: \.self) { name in Button(name) { Task { await model.saveProfile(name: model.state.nickname, title: name); choosingTitle = false } } } }.navigationTitle("选择称号").toolbar { Button("关闭") { choosingTitle = false } } }
+                NavigationStack { List { ForEach(model.titleOptions, id: \.key) { option in Button(option.name) { Task { await model.saveProfile(name: model.state.nickname, title: option.key); choosingTitle = false } }.disabled(model.busy) } }.navigationTitle("选择称号").toolbar { Button("关闭") { choosingTitle = false } } }
             }
     }
     private func icon(_ system: String, label: String, action: @escaping () -> Void) -> some View { Button(action: action) { Image(systemName: system).font(.title3).frame(width: 52, height: 50) }.buttonStyle(.bordered).accessibilityLabel(label) }

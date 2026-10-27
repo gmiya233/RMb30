@@ -102,6 +102,20 @@ actor CloudGateway {
         _ = try checked(JSONSerialization.jsonObject(with: result) as? [String: Any] ?? [:])
         guard try await get("/\(qq)/\(name)", limit: 1_048_576) == bytes else { throw MalodyError.invalid("云端回读未完成，本地成绩保留") }
     }
+    func publishTitle(qq: String, selection: String, records: [ScoreRecord], catalogue: Catalogue) async throws {
+        let qq = try JSONCoding.qq(qq)
+        let bytes = try PlayerTitle.document(qq: qq, server: server, selection: selection, records: records, catalogue: catalogue)
+        try await login()
+        _ = try checked(await api("/api/fs/mkdir", ["path": "/" + qq]))
+        let path = "/\(qq)/player-title.json"
+        let result = try await HTTPBytes.request(URL(string: server + "/api/fs/put")!, method: "PUT",
+            headers: ["Authorization": token, "Content-Type": "application/json", "File-Path": path, "As-Task": "false"], body: bytes, limit: 100_000)
+        _ = try checked(JSONSerialization.jsonObject(with: result) as? [String: Any] ?? [:])
+        guard try await get(path, limit: 4096) == bytes else { throw MalodyError.invalid("称号回读未完成，下次上传将重试") }
+    }
+    func communityRevision() async throws -> String {
+        try CatalogueRevision.communityHint(await get("/_community/v1/boards.json", limit: 2 * 1024 * 1024), server: server)
+    }
     private func history(qq: String, catalogue: Catalogue, create: Bool, progress: @Sendable (String) async -> Void) async throws -> [ScoreRecord] {
         let entries = try await items("/" + qq, create: create).filter { !$0.directory && ArchiveDocument.isFilename($0.name) }.sorted { $0.name < $1.name }
         guard entries.count <= 1000 else { throw MalodyError.invalid("云存档超过1000个分片") }

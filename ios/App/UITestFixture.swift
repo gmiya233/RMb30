@@ -23,6 +23,10 @@ enum UITestFixture {
         score += Data((0..<4).map { UInt8(truncatingIfNeeded: bits >> ($0 * 8)) })
         let replay = bytes(5, Data(Digests.md5(chart).utf8)) + bytes(6, Data("TEST PLAYER".utf8)) + bytes(8, score)
         try replay.write(to: replays.appendingPathComponent("fixture.mrv"), options: .atomic)
+        if ProcessInfo.processInfo.environment["MALODY_PACKAGE_UI_TESTING"] == "1" {
+            let package = Data(base64Encoded: "UEsDBBQAAAAIADpGW13kJ9JnRAAAAEsAAAAEAAAAMS5tY6tWyk0tSVSyqlbKzU9JVbIy11Eqzs9LBwmUZJbkAEWUQj0VnDMSi0oUAhKTsxPTU5Vqa3WU8vJLgHLRsTpAZblgVi0AUEsBAhQAFAAAAAgAOkZbXeQn0mdEAAAASwAAAAQAAAAAAAAAAAAAAIABAAAAADEubWNQSwUGAAAAAAEAAQAyAAAAZgAAAAAA")!
+            try package.write(to: root.appendingPathComponent("synthetic.mcz"), options: .atomic)
+        }
         return (catalogue, root)
     }
 }

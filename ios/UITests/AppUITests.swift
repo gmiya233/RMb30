@@ -64,4 +64,13 @@ final class AppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["首次使用 · 授权成绩文件夹"].waitForExistence(timeout: 10))
         let screenshot = XCTAttachment(screenshot: app.screenshot()); screenshot.name = "Settings accessibility text"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
+    func testChartPackageExport() throws {
+        app.terminate(); app.launchEnvironment["MALODY_PACKAGE_UI_TESTING"] = "1"; app.launch()
+        XCTAssertTrue(app.staticTexts["synthetic.mcz"].waitForExistence(timeout: 20))
+        let build = app.buttons["生成 Malody 导入包"]
+        XCTAssertTrue(build.waitForExistence(timeout: 10)); build.tap()
+        XCTAssertTrue(app.buttons["分享给 Malody / 保存到文件"].waitForExistence(timeout: 20))
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "Chart package validated and exported"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
 }

@@ -20,6 +20,9 @@ struct RootView: View {
             .navigationDestination(for: Chart.self) { SongDetail(chart: $0) }
         }
         .id(model.selectedTab)
+        .sheet(isPresented: $model.showingPackages) {
+            NavigationStack { ChartImportPage().toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { model.showingPackages = false } } } }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 Divider()
