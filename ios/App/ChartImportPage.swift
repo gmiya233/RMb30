@@ -68,8 +68,9 @@ actor ChartPackageWorker {
     @Published var output: URL?
     private let worker = ChartPackageWorker()
     private var task: Task<Void, Never>?
+    private var closed = false
     func add(_ urls: [URL]) {
-        guard !busy, !urls.isEmpty else { return }; busy = true; output = nil
+        guard !closed, !busy, !urls.isEmpty else { return }; busy = true; output = nil
         task = Task {
             defer { busy = false; task = nil }
             var skipped = 0, failures: [String] = []
@@ -99,7 +100,7 @@ actor ChartPackageWorker {
         }
     }
     func cancel() { task?.cancel() }
-    func close() { task?.cancel(); let previous = task; Task { await previous?.value; await worker.clear() } }
+    func close() { closed = true; task?.cancel(); let previous = task; Task { await previous?.value; await worker.clear() } }
 }
 
 struct ChartImportPage: View {
@@ -142,7 +143,9 @@ struct ChartImportPage: View {
         .onAppear { acceptIncoming() }
         .onChange(of: model.incomingPackages) { _ in acceptIncoming() }
         .onChange(of: queue.busy) { if !$0 { acceptIncoming() } }
-        .onDisappear { queue.close() }
+        // A document/share sheet can cover this page on small or landscape devices.
+        // Keep its files available until the page itself is closed.
+        .onDisappear { if !choosing && !sharing { queue.close() } }
     }
     private func acceptIncoming() {
         guard !queue.busy, !model.incomingPackages.isEmpty else { return }
