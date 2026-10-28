@@ -1,0 +1,42 @@
+name: iOS device package only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Prepare app resources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/ios-resources
+          gh release download v1.6.12 --repo gmiya233/RMb30 --pattern '*.APK' --dir build/ios-resources
+          python3 tools/prepare_ios_resources.py --apk build/ios-resources/*.APK
+          swift tools/normalize_ios_images.swift ios/Resources
+          swift tools/create_ios_icon.swift ios/App/Assets.xcassets/AppIcon.appiconset
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          cd ios && xcodegen generate
+      - name: Build unsigned arm64 device app
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/ios-device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build | tee build/ios-build.log
+          python3 tools/package_ios.py build/ios-device/Build/Products/Release-iphoneos/MalodyLink.app
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Malody-Link-iOS-self-sign-test
+          path: |
+            dist/*.ipa
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: iOS-build-diagnostics
+          path: build/ios-build.log
