@@ -20,7 +20,7 @@ SKIN = Path(__file__).parent / 'skin'
 MAX_BYTES = 16 * 1024 * 1024
 BEATS_PER_COLUMN = 12
 COLUMNS_PER_PAGE = 20
-MAX_PAGES = 8
+MAX_PAGES = 16
 
 
 class Timeline:
@@ -78,6 +78,7 @@ class Chart:
     first: float
     end: float
     has_effects: bool
+    reordered_segments: bool = False
 
     @property
     def columns(self):
@@ -127,7 +128,7 @@ def parse(data, keys=None):
                 keys = int(next(iter(declared)))
             else:
                 raise ValueError('Missing lane metadata')
-    notes = []
+    notes = []; reordered = False; total_points = 0
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError('Invalid note')
@@ -143,6 +144,9 @@ def parse(data, keys=None):
         segments = row.get('seg', [])
         if not isinstance(segments, list) or len(segments) > 1024:
             raise ValueError('Invalid slide segments')
+        total_points += len(segments)
+        if total_points > 100_000:
+            raise ValueError('Too many slide segments')
         points = [(start, x)]
         previous = start
         tail_direction = 0
@@ -151,12 +155,18 @@ def parse(data, keys=None):
                 raise ValueError('Invalid slide segment')
             at = start + beat(segment['beat'])
             sx = x + number(segment.get('x', 0), -255, 255)
-            if at < previous or not 0 <= sx <= 255:
+            if at < start or previous - at > 0.01 or not 0 <= sx <= 255:
                 raise ValueError('Invalid slide path')
+            if at < previous:
+                reordered = True
             tail_direction = segment.get('dir', 0)
             if type(tail_direction) is not int or not 0 <= tail_direction <= 63:
                 raise ValueError('Invalid tail direction')
             points.append((at, sx)); previous = at
+        # Some legacy converters emit a few milliseconds of reversed segment order.
+        # Sort by their original timestamps; no time values or source files change.
+        if segments:
+            points = [points[0]] + sorted(points[1:], key=lambda p: p[0])
         notes.append(Note(start, x, width, direction, tuple(points) if segments else (), tail_direction))
     if not notes:
         raise ValueError('No playable notes')
@@ -169,7 +179,7 @@ def parse(data, keys=None):
     bpms.sort()
     first = math.floor(min(0, min(n.start for n in notes)) / 4) * 4
     end = max(n.end for n in notes)
-    chart = Chart(sorted(notes, key=lambda n: n.start), bpms, keys, first, end, bool(doc.get('effect')) or any(t.get('delay') for t in times))
+    chart = Chart(sorted(notes, key=lambda n: n.start), bpms, keys, first, end, bool(doc.get('effect')) or any(t.get('delay') for t in times), reordered)
     if chart.pages > MAX_PAGES:
         raise ValueError('Chart exceeds preview page limit')
     return chart
@@ -322,6 +332,8 @@ def render(chart, metadata, font_path, page=1):
     note = '静态直轨读谱 · 按BPM/分度排版 · 不执行滚速、停顿或皮肤脚本'
     if chart.has_effects:
         note += ' · 本谱包含效果/停顿'
+    if chart.reordered_segments:
+        note += ' · 微小分段倒序按原时间排列'
     label(24, height - 58, note, 17, '#afc5d2', width - 48)
     label(24, height - 30, '皮肤：dreamcat / Acc@9961 / Sam_0324  ·  Malody Link', 15, '#8aa7b8', width - 48)
     output = BytesIO(); image.save(output, format='PNG', optimize=True)

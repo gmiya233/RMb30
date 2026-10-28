@@ -11,7 +11,7 @@ public final class ChartPreviewData {
     public ChartPreviewData(JSONObject doc,String server,JSONObject chart)throws Exception {
         if(doc.optInt("schema")!=1||!server.equals(doc.optString("server"))||doc.optInt("cid")!=chart.optInt("cid")||!chart.optString("server_hash").equals(doc.optString("server_hash")))throw new IOException("预览与当前谱面不匹配，请更新谱库后重试");
         keys=doc.optInt("keys");notes=doc.optInt("notes");JSONArray rows=doc.optJSONArray("pages");
-        if(!"ready".equals(doc.optString("status"))||keys<4||keys>6||notes<1||notes>40000||rows==null||rows.length()<1||rows.length()>8)throw new IOException("谱面预览暂未就绪，目前支持4K／5K／6K直轨");
+        if(!"ready".equals(doc.optString("status"))||keys<4||keys>6||notes<1||notes>40000||rows==null||rows.length()<1||rows.length()>16)throw new IOException("谱面预览暂未就绪，目前支持4K／5K／6K直轨");
         for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);Page p=new Page();p.image=row.getString("image");p.digest=row.getString("sha256");p.bytes=row.getInt("bytes");p.width=row.getInt("width");p.height=row.getInt("height");
             if(!p.digest.matches("[a-f0-9]{64}")||!p.image.equals(chart.optInt("cid")+"-"+p.digest+".png")||p.bytes<1||p.bytes>4*1024*1024||p.width<1||p.width>8192||p.height<1||p.height>4096||(long)p.width*p.height>16000000)throw new IOException("预览图片信息无效");pages.add(p);}
     }

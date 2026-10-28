@@ -45,7 +45,7 @@ class ChartPreviews:
             if doc.get('schema') != 1 or doc.get('server') != self.queries.catalogue()[0] or doc.get('cid') != cid or doc.get('server_hash') != found[0].get('server_hash'):
                 raise ValueError('Preview namespace mismatch')
             pages = doc.get('pages', [])
-            if doc.get('status') != 'ready' or not 1 <= len(pages) <= 8:
+            if doc.get('status') != 'ready' or not 1 <= len(pages) <= 16:
                 raise ValueError('Preview not ready')
             if not 1 <= page <= len(pages):
                 return f'这张谱面共 {len(pages)} 页，请发送：谱面预览 {cid} 1'
