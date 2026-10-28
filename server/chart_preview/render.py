@@ -15,12 +15,9 @@ import re
 
 from PIL import Image, ImageDraw, ImageFont
 
-VERSION = 'rmvi-static-4-adaptive-open-arrow'
+VERSION = 'rmvi-static-5-single-beat-sheet'
 SKIN = Path(__file__).parent / 'skin'
 MAX_BYTES = 16 * 1024 * 1024
-BEATS_PER_COLUMN = 12
-COLUMNS_PER_PAGE = 20
-MAX_PAGES = 16
 
 
 class Timeline:
@@ -81,29 +78,36 @@ class Chart:
     reordered_segments: bool = False
 
     @property
+    def beats_per_column(self):
+        # Fit the complete chart in one sheet; boundaries stay on whole measures.
+        span = self.end - self.first + 0.000001
+        return max(12, math.ceil(span / 20 / 4) * 4)
+
+    @property
     def columns(self):
-        return max(1, math.ceil((self.end - self.first + 0.000001) / BEATS_PER_COLUMN))
+        return max(1, math.ceil((self.end - self.first + 0.000001) / self.beats_per_column))
 
     @property
     def pages(self):
-        return math.ceil(self.columns / self.spacing['per_page'])
+        return 1
 
     @cached_property
     def spacing(self):
         clock = Timeline(self.bpms)
         beats = sorted({n.start for n in self.notes} | {p[0] for n in self.notes for p in n.points})
-        # Ignore millisecond humanization inside a chord for spacing decisions only;
-        # drawing still uses each note's exact original timestamp.
         grouped = []
         for value in beats:
-            if not grouped or clock.seconds(value) - clock.seconds(grouped[-1]) >= 0.012:
+            if not grouped or value - grouped[-1] >= 1 / 48:
                 grouped.append(value)
-        intervals = [clock.seconds(b) - clock.seconds(a) for a, b in zip(grouped, grouped[1:])]
-        rate = min(1000, max(300, 22 / min(intervals))) if intervals else 300
-        durations = [clock.seconds(self.first + (i+1)*BEATS_PER_COLUMN) - clock.seconds(self.first + i*BEATS_PER_COLUMN) for i in range(self.columns)]
-        height = max(640, min(3600, math.ceil(max(durations) * rate)))
-        per_page = max(1, min(COLUMNS_PER_PAGE, (16_000_000 // (height + 262) - 40) // 376))
-        return {'clock': clock, 'rate': rate, 'height': height, 'per_page': per_page, 'events': grouped}
+        intervals = [b - a for a, b in zip(grouped, grouped[1:])]
+        # Musical beats, not elapsed seconds: low BPM and stops must not stretch
+        # empty space or make other columns occupy only a fraction of their height.
+        rate = min(300, max(90, 22 / min(intervals))) if intervals else 90
+        width = max(960, self.columns * 376 + 40)
+        limit = min(3600, 16_000_000 // width - 262)
+        height = min(limit, max(640, math.ceil(self.beats_per_column * rate)))
+        return {'clock': clock, 'rate': height / self.beats_per_column,
+                'height': height, 'per_page': self.columns, 'events': grouped}
 
 
 def parse(data, keys=None):
@@ -177,11 +181,9 @@ def parse(data, keys=None):
     for row in times:
         bpms.append((beat(row['beat']), number(row['bpm'], 1, 10000)))
     bpms.sort()
-    first = math.floor(min(0, min(n.start for n in notes)) / 4) * 4
+    first = math.floor(min(n.start for n in notes) / 4) * 4
     end = max(n.end for n in notes)
     chart = Chart(sorted(notes, key=lambda n: n.start), bpms, keys, first, end, bool(doc.get('effect')) or any(t.get('delay') for t in times), reordered)
-    if chart.pages > MAX_PAGES:
-        raise ValueError('Chart exceeds preview page limit')
     return chart
 
 
@@ -204,6 +206,7 @@ def sprite(name, width, height):
 def render(chart, metadata, font_path, page=1):
     if type(page) is not int or not 1 <= page <= chart.pages:
         raise ValueError('Invalid preview page')
+    beats_per_column = chart.beats_per_column
     spacing = chart.spacing; clock = spacing['clock']; per_page = spacing['per_page']
     start_column = (page - 1) * per_page
     count = min(per_page, chart.columns - start_column)
@@ -221,34 +224,33 @@ def render(chart, metadata, font_path, page=1):
         draw.text((x, y), value, font=face, fill=color)
 
     label(24, 16, metadata.get('title') or '未命名歌曲', 32, '#ecf9ff', width - 48)
-    label(24, 62, f"{clean(metadata.get('version'))}  ·  {chart.keys}K  ·  CID {metadata.get('cid', '')}  ·  {len(chart.notes)} 音符  ·  {page}/{chart.pages} 页", 22, maximum=width - 48)
-    label(24, 103, 'EX Rhythm Master VI · 从下往上，再向右读 · 每栏3小节 · BPM/分度自适应间距', 18, '#94dce6', width - 48)
+    label(24, 62, f"{clean(metadata.get('version'))}  ·  {chart.keys}K  ·  CID {metadata.get('cid', '')}  ·  {len(chart.notes)} 音符  ·  全谱单图", 22, maximum=width - 48)
+    label(24, 103, f'EX Rhythm Master VI · 从下往上，再向右读 · 每栏{beats_per_column // 4}小节 · 按节拍/分度排版', 18, '#94dce6', width - 48)
     for index in range(count):
-        at = chart.first + (start_column + index) * BEATS_PER_COLUMN
+        at = chart.first + (start_column + index) * beats_per_column
         tile = Image.new('RGBA', (track_width + margin*2, track_height + 1), '#101924')
         td = ImageDraw.Draw(tile)
-        duration = clock.seconds(at + BEATS_PER_COLUMN) - clock.seconds(at)
-        rate = min(spacing['rate'], spacing['height'] / duration)
+        rate = spacing['rate']
 
         def pixel(time, x):
-            return margin + x / 255 * track_width, 8 + spacing['height'] - (clock.seconds(time) - clock.seconds(at)) * rate
+            return margin + x / 255 * track_width, 8 + spacing['height'] - (time - at) * rate
 
         for lane in range(chart.keys):
             x1, x2 = margin + round(lane * track_width / chart.keys), margin + round((lane + 1) * track_width / chart.keys)
             td.rectangle((x1, 0, x2, track_height), fill='#263545' if lane % 2 else '#1d2a39')
             td.line((x1, 0, x1, track_height), fill='#526472', width=1)
-        for subdivision in range(BEATS_PER_COLUMN*4 + 1):
+        for subdivision in range(beats_per_column*4 + 1):
             _, y = pixel(at + subdivision / 4, 0)
             td.line((margin, y, margin + track_width, y), fill='#536d7d' if subdivision % 16 == 0 else '#354653' if subdivision % 4 == 0 else '#2b3b49')
 
         def head(time, x, lane, long=False):
-            if at <= time < at + BEATS_PER_COLUMN:
+            if at <= time < at + beats_per_column:
                 px, py = pixel(time, x)
                 item = sprite(f'{chart.keys}note{"l" if long else ""}{lane}.png', round(track_width / chart.keys) - 3, 14)
                 tile.alpha_composite(item, (round(px - item.width / 2), round(py - item.height / 2)))
 
         def arrow(time, x, direction):
-            if not at <= time < at + BEATS_PER_COLUMN or not direction:
+            if not at <= time < at + beats_per_column or not direction:
                 return
             px, py = pixel(time, x)
             # NoteFlag: right=2, up=4, left=8, down=16 (Malody Editor API).
@@ -257,7 +259,7 @@ def render(chart, metadata, font_path, page=1):
             td.line((back[0] - dy*8, back[1] + dx*8, px, py, back[0] + dy*8, back[1] - dx*8), fill='#c5ff91', width=4)
 
         def swipe(time, origin, target, outside_head=False):
-            if not at <= time < at + BEATS_PER_COLUMN or origin == target:
+            if not at <= time < at + beats_per_column or origin == target:
                 return
             sx, cy = pixel(time, origin); ex, _ = pixel(time, target)
             sign = 1 if ex > sx else -1
@@ -270,14 +272,14 @@ def render(chart, metadata, font_path, page=1):
             td.line((ex-sign*length, cy-9, ex, cy, ex-sign*length, cy+9), fill='#c5ff91', width=4)
 
         for note in chart.notes:
-            if note.end < at or note.start >= at + BEATS_PER_COLUMN:
+            if note.end < at or note.start >= at + beats_per_column:
                 continue
             lane = min(chart.keys, max(1, int(note.x / 256 * chart.keys) + 1))
             if note.points:
                 for segment_index, ((t1, x1), (t2, x2)) in enumerate(zip(note.points, note.points[1:])):
-                    if t2 < at or t1 > at + BEATS_PER_COLUMN:
+                    if t2 < at or t1 > at + beats_per_column:
                         continue
-                    a, b = max(at, t1), min(at + BEATS_PER_COLUMN, t2)
+                    a, b = max(at, t1), min(at + beats_per_column, t2)
                     if b < a:
                         continue
                     # Rhythm Master holds stay in the original lane until the segment
@@ -286,19 +288,19 @@ def render(chart, metadata, font_path, page=1):
                     if b > a:
                         body = sprite('notebody.png', 8, max(1, round(abs(p2[1] - p1[1]))))
                         tile.alpha_composite(body, (round(p1[0] - 4), round(min(p1[1], p2[1]))))
-                    if x1 != x2 and at <= t2 < at + BEATS_PER_COLUMN:
+                    if x1 != x2 and at <= t2 < at + beats_per_column:
                         before, after = pixel(t2, x1), pixel(t2, x2)
                         td.line((*before, *after), fill='#9ee94f', width=5)
                         td.line((*before, *after), fill='#efffd1', width=2)
                         if segment_index == len(note.points) - 2:
                             swipe(t2, x1, x2)
                 end, ex = note.points[-1]
-                if at <= end < at + BEATS_PER_COLUMN and note.points[-2][1] == ex:
+                if at <= end < at + beats_per_column and note.points[-2][1] == ex:
                     px, py = pixel(end, ex); tail = sprite('notefbody0.png', 13, 13)
                     tile.alpha_composite(tail, (round(px - 6), round(py - 6)))
                 arrow(end, ex, note.tail_direction)
             head(note.start, note.x, lane, bool(note.points) or bool(note.direction))
-            if note.direction & (2 | 8) and at <= note.start < at + BEATS_PER_COLUMN:
+            if note.direction & (2 | 8) and at <= note.start < at + beats_per_column:
                 distance = int(note.width) % 10
                 target = note.x + (1 if note.direction & 2 else -1) * max(1, distance) * 256 / chart.keys
                 start_point, end_point = pixel(note.start, note.x), pixel(note.start, target)
@@ -310,11 +312,11 @@ def render(chart, metadata, font_path, page=1):
                 arrow(note.start, note.x, note.direction)
         left = 24 + index * column_width
         image.paste(tile.convert('RGB'), (left, header + track_top))
-        label(left + margin, header + 3, f'#{start_column + index + 1:02d}  {at:g}–{at+BEATS_PER_COLUMN:g} 拍', 16, '#9bd6e4')
-        for bar in range(4):
+        label(left + margin, header + 3, f'#{start_column + index + 1:02d}  {at:g}–{at+beats_per_column:g} 拍', 16, '#9bd6e4')
+        for bar in range(beats_per_column // 4 + 1):
             _, y = pixel(at + bar*4, 0)
             label(left + 6, header + track_top + y - 9, f'#{int((at + bar*4)/4)}', 13, '#b4cbd7')
-        events = [b for b in spacing['events'] if at <= b < at+BEATS_PER_COLUMN]
+        events = [b for b in spacing['events'] if at <= b < at+beats_per_column]
         all_events = spacing['events']
         for value in events:
             position = bisect_right(all_events, value)
@@ -324,12 +326,18 @@ def render(chart, metadata, font_path, page=1):
             fraction = Fraction(gap / 4).limit_denominator(192)
             _, y = pixel(value, 0)
             label(left + margin + track_width + 7, header + track_top + y - 18, str(fraction), 12, '#aec8d2')
-        for change, bpm in chart.bpms:
-            if at <= change < at + BEATS_PER_COLUMN:
+        changes = list(chart.bpms)
+        if index == 0 and not any(change == chart.first for change, _ in changes):
+            changes.append((chart.first, clock.bpms[max(0, bisect_right(clock.beats, chart.first) - 1)]))
+        for change, bpm in sorted(changes):
+            if at <= change < at + beats_per_column:
                 _, position = pixel(change, 0); y = header + track_top + position
                 draw.line((left + margin, y, left + margin + track_width, y), fill='#50a0b8', width=2)
-                label(left + margin + 2, max(header + track_top, y - 19), f'BPM {bpm:g}', 13, '#8ee5f1')
-    note = '静态直轨读谱 · 按BPM/分度排版 · 不执行滚速、停顿或皮肤脚本'
+                bpm_y = y + 5 if y + 34 < header + track_top + track_height else y - 43
+                label(left + 2, bpm_y, 'BPM', 11, '#8ee5f1')
+                label(left + 2, bpm_y + 14, f'{bpm:g}', 12, '#8ee5f1', margin - 5)
+
+    note = '静态直轨读谱 · 按节拍/分度排版 · 不执行滚速、停顿或皮肤脚本'
     if chart.has_effects:
         note += ' · 本谱包含效果/停顿'
     if chart.reordered_segments:

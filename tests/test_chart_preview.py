@@ -50,6 +50,20 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(slow.spacing['clock'].seconds(1) - slow.spacing['clock'].seconds(0), 0.5)
         self.assertAlmostEqual(slow.spacing['clock'].seconds(33) - slow.spacing['clock'].seconds(32), 1 / 3)
 
+    def test_single_sheet_and_slow_bpm_do_not_stretch(self):
+        doc = json.loads(self.data())
+        normal = parse(json.dumps(doc).encode(), 4)
+        doc['time'] = [{'beat': [0, 0, 1], 'bpm': 1}, {'beat': [12, 0, 1], 'bpm': 200}]
+        slow = parse(json.dumps(doc).encode(), 4)
+        self.assertEqual(normal.spacing['height'], slow.spacing['height'])
+        self.assertEqual(normal.spacing['rate'], slow.spacing['rate'])
+        doc['note'].append({'beat': [4096, 0, 1], 'x': 31, 'w': 60})
+        long = parse(json.dumps(doc).encode(), 4)
+        self.assertEqual(long.pages, 1)
+        self.assertLessEqual(long.columns, 20)
+        self.assertGreater(long.first + long.columns * long.beats_per_column, long.end)
+        self.assertLessEqual((long.columns * 376 + 40) * (long.spacing['height'] + 262), 16000000)
+
     @unittest.skipUnless(FONT, 'CJK font required')
     def test_hold_is_orthogonal_with_terminal_arrow_only(self):
         from PIL import Image
@@ -62,7 +76,7 @@ class PreviewTests(unittest.TestCase):
         def green(x, y):
             pixels = image.crop((round(x)-2, round(y)-2, round(x)+3, round(y)+3)).get_flattened_data()
             return any(g > 150 and g > r*1.15 and g > b*1.15 for r, g, b in pixels)
-        def location(t, x): return 24+68+x/255*216, 180+8+chart.spacing['height']-t*150
+        def location(t, x): return 24+68+x/255*216, 180+8+chart.spacing['height']-t*chart.spacing['rate']
         self.assertTrue(green(*location(2, 31)), 'hold stays in its original lane')
         self.assertFalse(green(*location(2, 95)), 'no diagonal interpolation through another lane')
         x, y = location(4, 159)
@@ -116,7 +130,7 @@ class PreviewTests(unittest.TestCase):
             (root / '1.json').write_text(json.dumps(doc))
             bot = ChartPreviews(Queries(), root)
             self.assertEqual(bot.execute('谱面预览 1'), data); self.assertEqual(bot.execute('谱面预览 Test'), data)
-            self.assertIn('共 1 页', bot.execute('谱面预览 1 2'))
+            self.assertIn('完整单图', bot.execute('谱面预览 1 2'))
             (root / image).write_bytes(b'corrupt'); self.assertIsInstance(bot.execute('谱面预览 1'), str)
             row['search_visible'] = False; self.assertIn('没有找到', bot.execute('谱面预览 1'))
             row['search_visible'] = True; row['server_hash'] = 'new'; self.assertIsInstance(bot.execute('谱面预览 1'), str)

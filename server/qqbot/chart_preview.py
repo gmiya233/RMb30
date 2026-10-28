@@ -17,7 +17,7 @@ class ChartPreviews:
     def execute(self, content):
         command, argument = command_parts(content)
         if command not in self.COMMANDS or len(content) > 200:
-            return '用法：谱面预览 谱面ID [页码]，也可以输入歌名。'
+            return '用法：谱面预览 谱面ID，也可以输入歌名。'
         page = 1
         if argument.isdecimal():
             chart_id = int(argument)
@@ -33,7 +33,7 @@ class ChartPreviews:
             found = self.queries.search(argument) if argument else []
         if len(found) != 1:
             if not found:
-                return '没有找到可预览的谱面。用法：谱面预览 谱面ID [页码]。'
+                return '没有找到可预览的谱面。用法：谱面预览 谱面ID。'
             return '请选择具体谱面ID：\n' + '\n'.join(f"{c['cid']} · {text(c.get('title'), 38)} · {text(c.get('version'), 35)}" for c in found[:8])
         cid = found[0]['cid']
         try:
@@ -48,7 +48,7 @@ class ChartPreviews:
             if doc.get('status') != 'ready' or not 1 <= len(pages) <= 16:
                 raise ValueError('Preview not ready')
             if not 1 <= page <= len(pages):
-                return f'这张谱面共 {len(pages)} 页，请发送：谱面预览 {cid} 1'
+                return f'这张谱面为完整单图，请发送：谱面预览 {cid}' if len(pages) == 1 else f'这张谱面共 {len(pages)} 页，请发送：谱面预览 {cid} 1'
             image = pages[page - 1]
             name = image['image']
             if not re.fullmatch(rf'{cid}-[a-f0-9]{{64}}\.png', name):

@@ -60,4 +60,4 @@ SDK 初始化和回复失败日志只记录错误类别，不记录消息、凭�
 腾讯官方示例：https://github.com/tencent-connect/botpy/blob/master/examples/demo_group_reply_text.py
 # 谱面预览
 
-`@小师妹 谱面预览 谱面ID [页码]` 返回 EX Rhythm Master VI 等宽直轨展开图。也可输入歌名，多难度会列出 ID。机器人只读预先生成的 PNG，不加载原始 MC 或执行皮肤脚本。服务与目录配置见 [谱面预览服务](../chart_preview/README.md)。
+`@小师妹 谱面预览 谱面ID` 返回 EX Rhythm Master VI 等宽直轨展开图。也可输入歌名，多难度会列出 ID。机器人只读预先生成的 PNG，不加载原始 MC 或执行皮肤脚本。服务与目录配置见 [谱面预览服务](../chart_preview/README.md)。
