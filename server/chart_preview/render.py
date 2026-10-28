@@ -15,7 +15,7 @@ import re
 
 from PIL import Image, ImageDraw, ImageFont
 
-VERSION = 'rmvi-static-6-imd-companion'
+VERSION = 'rmvi-static-7-rectangular-heads'
 SKIN = Path(__file__).parent / 'skin'
 MAX_BYTES = 16 * 1024 * 1024
 
@@ -204,6 +204,28 @@ def sprite(name, width, height):
         return image.crop(image.getbbox() or (0, 0, image.width, image.height)).resize((width, height), Image.Resampling.LANCZOS)
 
 
+@lru_cache(maxsize=128)
+def rectangular_head(name, width, height):
+    # Straighten each scanline of the perspective skin sprite, preserving its
+    # colour and texture while giving every row identical vertical edges.
+    with Image.open(SKIN / name) as source:
+        source = source.convert('RGBA')
+        mask = source.getchannel('A').point(lambda alpha: 255 if alpha >= 128 else 0)
+        bounds = mask.getbbox()
+        if bounds is None:
+            raise ValueError('Empty note sprite')
+        source = source.crop(bounds); mask = mask.crop(bounds)
+        result = Image.new('RGBA', (width, source.height))
+        for y in range(source.height):
+            row_bounds = mask.crop((0, y, source.width, y+1)).getbbox()
+            if row_bounds is None:
+                raise ValueError('Empty note sprite row')
+            row = source.crop((row_bounds[0], y, row_bounds[2], y+1)).resize((width,1), Image.Resampling.LANCZOS)
+            row.putalpha(255)
+            result.paste(row,(0,y))
+        return result.resize((width,height),Image.Resampling.LANCZOS)
+
+
 def render(chart, metadata, font_path, page=1):
     if type(page) is not int or not 1 <= page <= chart.pages:
         raise ValueError('Invalid preview page')
@@ -247,7 +269,7 @@ def render(chart, metadata, font_path, page=1):
         def head(time, x, lane, long=False):
             if at <= time < at + beats_per_column:
                 px, py = pixel(time, x)
-                item = sprite(f'{chart.keys}note{"l" if long else ""}{lane}.png', round(track_width / chart.keys) - 3, 14)
+                item = rectangular_head(f'{chart.keys}note{"l" if long else ""}{lane}.png', round(track_width / chart.keys) - 3, 14)
                 tile.alpha_composite(item, (round(px - item.width / 2), round(py - item.height / 2)))
 
         def arrow(time, x, direction):
@@ -266,7 +288,7 @@ def render(chart, metadata, font_path, page=1):
             sign = 1 if ex > sx else -1
             if outside_head:
                 shift = sign * (track_width / chart.keys / 2 + 3)
-                sx += shift; ex += shift
+                sx += shift
             # A plain shaft leaving the rectangle, ending in an open chevron.
             td.line((sx, cy, ex, cy), fill='#b7f27c', width=4)
             length = min(15, max(9, abs(ex-sx) * 0.35))

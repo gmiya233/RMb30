@@ -85,6 +85,10 @@ class PreviewTests(unittest.TestCase):
         self.assertTrue(green(x+13, y-9), 'final left flick has an open chevron')
         x, y = location(8, 95)
         self.assertTrue(green(x+34, y), 'standalone shaft leaves the rectangle edge')
+        self.assertTrue(green(x+54, y), 'single flick reaches its target lane')
+        self.assertFalse(green(x+77, y), 'single flick must not overshoot its target by half a key')
+        from render import rectangular_head
+        self.assertEqual(rectangular_head('4note1.png',51,14).getchannel('A').getextrema(),(255,255))
 
     def test_invalid_note_does_not_silently_disappear(self):
         doc = json.loads(self.data()); doc['note'][0]['x'] = 500
