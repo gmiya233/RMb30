@@ -15,7 +15,7 @@ public struct ChartPreviewDocument {
         guard data.count <= 16384, let doc = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               doc["schema"] as? Int == 1, doc["server"] as? String == server, doc["cid"] as? Int == chart.cid,
               doc["server_hash"] as? String == chart.serverHash else { throw MalodyError.invalid("预览与当前谱面不匹配，请更新谱库后重试") }
-        guard doc["status"] as? String == "ready", let rows = doc["pages"] as? [[String: Any]], (1...4).contains(rows.count),
+        guard doc["status"] as? String == "ready", let rows = doc["pages"] as? [[String: Any]], (1...8).contains(rows.count),
               let keys = doc["keys"] as? Int, (4...6).contains(keys), let notes = doc["notes"] as? Int, (1...40000).contains(notes) else { throw MalodyError.invalid("谱面预览暂未就绪，目前支持4K／5K／6K直轨") }
         let pages = try JSONCoding.decode([ChartPreviewPage].self, JSONSerialization.data(withJSONObject: rows))
         for page in pages {

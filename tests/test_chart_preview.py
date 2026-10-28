@@ -32,14 +32,29 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(chart.keys, 4); self.assertEqual(len(chart.notes), 3)
         self.assertEqual(chart.notes[-1].points, ((30, 31), (34, 95), (38, 159)))
         self.assertEqual(chart.notes[1].direction, 8)
-        self.assertEqual(chart.columns, 2)
+        self.assertEqual(chart.columns, 4)
         self.assertEqual(beat([3, 1, 4]), 3.25)
-        for bad in [[0, 1, 0], [0, -1, 4], [0, 4, 4], [True, 0, 1]]:
+        self.assertAlmostEqual(beat([5, -1, 384]), 5 - 1 / 384)
+        self.assertEqual(beat([0, 4, 4]), 1)
+        for bad in [[0, 1, 0], [0, 1, -4], [0, 1000001, 4], [True, 0, 1]]:
             with self.assertRaises(ValueError): beat(bad)
+
+    def test_adaptive_spacing_uses_bpm_and_subdivision(self):
+        dense = json.loads(self.data())
+        dense['note'] = [{'beat': [i // 32, i % 32, 32], 'x': 31, 'w': 60} for i in range(33)]
+        slow = parse(self.data(), 4)
+        fine = parse(json.dumps(dense).encode(), 4)
+        self.assertGreater(fine.spacing['rate'], slow.spacing['rate'])
+        self.assertLessEqual(fine.spacing['height'], 3600)
+        self.assertGreaterEqual(fine.spacing['per_page'], 1)
+        self.assertEqual(slow.spacing['clock'].seconds(1) - slow.spacing['clock'].seconds(0), 0.5)
+        self.assertAlmostEqual(slow.spacing['clock'].seconds(33) - slow.spacing['clock'].seconds(32), 1 / 3)
 
     def test_invalid_note_does_not_silently_disappear(self):
         doc = json.loads(self.data()); doc['note'][0]['x'] = 500
         with self.assertRaises(ValueError): parse(json.dumps(doc).encode())
+        doc = json.loads(self.data()); del doc['note'][0]['w']
+        self.assertEqual(parse(json.dumps(doc).encode(), 4).keys, 4)
         doc = json.loads(self.data()); doc['note'][2]['seg'][1]['beat'] = [1, 0, 1]
         with self.assertRaises(ValueError): parse(json.dumps(doc).encode())
         doc = json.loads(self.data()); doc['meta']['mode'] = 0
