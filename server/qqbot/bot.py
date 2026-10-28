@@ -12,6 +12,7 @@ from b30_commands import B30Commands, command_parts
 from song_search import SongSearch
 from chart_preview import ChartPreviews
 from markdown_probe import probe
+from button_menu import COMMANDS as MENU_COMMANDS, send_menu
 
 
 class Gate:
@@ -74,6 +75,12 @@ def main():
                 return
             try:
                 async with slots:
+                    if command_parts(message.content)[0] in MENU_COMMANDS:
+                        from botpy.http import Route
+                        async def send_menu_reply(payload):
+                            return await self.http.request(Route('POST', '/v2/groups/{group_openid}/messages', group_openid=message.group_openid), json=payload)
+                        await send_menu(send_menu_reply, message.id, queries.HELP)
+                        return
                     if command_parts(message.content)[0] in ('markdown测试', 'md测试'):
                         from botpy.http import Route
                         async def send_probe(payload):
