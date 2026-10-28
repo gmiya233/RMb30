@@ -120,12 +120,15 @@ struct B30Page: View {
 
 struct ZoomImage: UIViewRepresentable {
     let image: UIImage
+    var maximumZoom: CGFloat = 5
     func makeUIView(context: Context) -> UIScrollView {
-        let scroll = ZoomScroll(); scroll.minimumZoomScale = 1; scroll.maximumZoomScale = 5; scroll.delegate = context.coordinator
+        let scroll = ZoomScroll(); scroll.minimumZoomScale = 1; scroll.maximumZoomScale = maximumZoom; scroll.delegate = context.coordinator
         scroll.picture.image = image; scroll.picture.contentMode = .scaleAspectFit; scroll.addSubview(scroll.picture)
         return scroll
     }
-    func updateUIView(_ scroll: UIScrollView, context: Context) {}
+    func updateUIView(_ scroll: UIScrollView, context: Context) {
+        if let zoom = scroll as? ZoomScroll, zoom.picture.image !== image { zoom.zoomScale = 1; zoom.picture.image = image; zoom.picture.frame = zoom.bounds; zoom.contentSize = zoom.bounds.size }
+    }
     func makeCoordinator() -> Coordinator { Coordinator() }
     final class Coordinator: NSObject, UIScrollViewDelegate { func viewForZooming(in scrollView: UIScrollView) -> UIView? { (scrollView as? ZoomScroll)?.picture } }
     final class ZoomScroll: UIScrollView {

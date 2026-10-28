@@ -89,6 +89,9 @@ actor CloudGateway {
         throw MalodyError.invalid("云目录分页超过读取容量")
     }
     func get(_ path: String, limit: Int) async throws -> Data {
+        #if DEBUG
+        if server == "https://fixture.invalid", let bytes = try UITestFixture.preview(path) { return bytes }
+        #endif
         try await login()
         let response = try checked(await api("/api/fs/get", ["path": path, "password": ""]))
         guard let address = response["raw_url"] as? String, let url = URL(string: address), let origin = URL(string: server) else { throw MalodyError.invalid("云端文件地址无效") }

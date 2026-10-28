@@ -3,6 +3,18 @@ import ZIPFoundation
 @testable import MalodyCore
 
 final class ParityTests: XCTestCase {
+    func testChartPreviewIdentityAndDigest() throws {
+        let c = try chart(), server = "https://fixture.invalid", bytes = Data([137,80,78,71,13,10,26,10,1])
+        let digest = Digests.sha256(bytes)
+        var row: [String: Any] = ["image": "1-\(digest).png", "sha256": digest, "bytes": bytes.count, "width": 960, "height": 1300]
+        func doc(_ source: String) throws -> Data { try JSONSerialization.data(withJSONObject: ["schema": 1, "server": source, "cid": 1, "server_hash": "hash", "status": "ready", "keys": 4, "notes": 3, "pages": [row]]) }
+        let preview = try ChartPreviewDocument(doc(server), chart: c, server: server)
+        try preview.pages[0].verify(bytes)
+        XCTAssertThrowsError(try preview.pages[0].verify(Data([0])))
+        XCTAssertThrowsError(try ChartPreviewDocument(doc("other"), chart: c, server: server))
+        row["image"] = "../image.png"
+        XCTAssertThrowsError(try ChartPreviewDocument(doc(server), chart: c, server: server))
+    }
     func chart() throws -> Chart {
         let row: [String: Any] = ["cid": 1, "sid": 2, "server_hash": "hash", "version": "LV.12", "mode": 7, "level": 12, "title": "Song"]
         return try JSONCoding.decode(Chart.self, JSONSerialization.data(withJSONObject: row))

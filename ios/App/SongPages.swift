@@ -74,6 +74,7 @@ struct SongDetail: View {
                 ForEach(charts) { row in Card {
                     HStack { Text(row.levelLabel).font(.headline); Text(row.keysLabel).font(.caption.bold()).padding(6).background(Palette.selected, in: Capsule()); Spacer(); Label(community?.chartDownloads[row.cid].map(String.init) ?? "—", systemImage: "arrow.down.circle").font(.caption).accessibilityLabel("谱面下载量") }
                     Text(row.version).font(.subheadline)
+                    NavigationLink { ChartPreviewScreen(chart: row) } label: { Label("谱面预览", systemImage: "pianokeys").frame(minHeight: 44) }
                     Text("谱师 · " + (row.creator.isEmpty ? "未提供" : row.creator)).font(.subheadline).foregroundStyle(.secondary)
                     NavigationLink("该谱面排行榜") { ChartRankingPage().onAppear { model.rankingCID = row.cid } }.frame(minHeight: 44)
                 } }

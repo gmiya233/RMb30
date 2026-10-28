@@ -73,4 +73,15 @@ final class AppUITests: XCTestCase {
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "Chart package validated and exported"; screenshot.lifetime = .keepAlways; add(screenshot)
     }
+    func testStraightChartPreview() throws {
+        app.terminate(); app.launchEnvironment["MALODY_PREVIEW_UI_TESTING"] = "1"; app.launch()
+        XCTAssertTrue(app.buttons["歌曲"].waitForExistence(timeout: 15)); app.buttons["歌曲"].tap()
+        let song = app.staticTexts["UITest Song"].firstMatch
+        XCTAssertTrue(song.waitForExistence(timeout: 15)); song.tap()
+        let preview = app.buttons["谱面预览"]
+        XCTAssertTrue(preview.waitForExistence(timeout: 10)); preview.tap()
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "直轨谱面展开图").firstMatch.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["保存谱面预览到相册"].exists)
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot()); screenshot.name = "Straight lane chart preview"; screenshot.lifetime = .keepAlways; add(screenshot)
+    }
 }

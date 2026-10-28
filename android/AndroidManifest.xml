@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="32" android:versionName="1.6.11">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="33" android:versionName="1.6.12">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
   <uses-permission android:name="android.permission.INTERNET" />
@@ -22,6 +22,7 @@
     <activity android:name=".InternalReaderActivity" android:exported="false" />
     <activity android:name=".PlayerProfileActivity" android:exported="false" />
     <activity android:name=".SongCommunityActivity" android:exported="false" />
+    <activity android:name=".ChartPreviewActivity" android:exported="false" />
     <activity android:name=".UpdateActivity" android:exported="false" />
     <activity android:name=".QqDownloadSettingsActivity" android:exported="false" />
     <activity android:name=".ChartImportActivity" android:exported="true">

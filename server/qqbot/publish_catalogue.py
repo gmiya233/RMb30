@@ -19,7 +19,7 @@ def creator_filter():
 
 def public_catalogue(doc):
     visible = creator_filter()
-    fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote')
+    fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote', 'server_hash')
     return {'server': doc['server'], 'charts': [
         {k: row[k] for k in fields if k in row} | {'search_visible': visible(str(row.get('creator') or '')), 'artworks': artwork_candidates(row)}
         for row in doc['charts']]}
