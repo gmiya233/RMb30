@@ -119,6 +119,46 @@ class PreviewTests(unittest.TestCase):
             row['path'] = '../outside'
             with self.assertRaises(ValueError): source_file(root, row)
 
+    def test_imd_binary_records_and_chain_geometry(self):
+        import struct
+        from imd import parse_imd
+        def binary(rows):
+            return struct.pack('<IIId', 9000, 1, 0, 120.0) + b'\x03\x03' + struct.pack('<I', len(rows)) + b''.join(struct.pack('<BBIBi', kind,0,time,lane,value) for kind,time,lane,value in rows)
+        rows = [(0,0,0,0),(1,500,2,-2),(2,1000,1,500),
+                (0x62,2000,0,500),(0x21,2500,0,2),(0x22,3000,2,500),(0xa1,3500,2,-1),
+                (0x61,4000,1,1),(0xa2,4500,2,500)]
+        chart = parse_imd(binary(rows),4)
+        self.assertEqual(len(chart.notes),5)
+        self.assertEqual(chart.notes[1].direction,8)
+        self.assertEqual(chart.notes[1].width,62)
+        self.assertEqual(chart.notes[2].end,3)
+        self.assertEqual(chart.notes[3].points,((4,32),(5,32),(5,160),(6,160),(7,160),(7,96)))
+        self.assertEqual(chart.notes[4].points,((8,96),(8,160),(9,160),(10,160)))
+        for bad in [binary(rows)[:-1], binary([(0x21,0,0,1)]), binary([(1,0,0,-1)]), binary([(0x62,0,0,500)])]:
+            with self.assertRaises(ValueError): parse_imd(bad,4)
+
+    @unittest.skipUnless(FONT, 'CJK font required')
+    def test_publisher_prefers_exact_imd_and_tracks_changes(self):
+        import struct
+        def binary(lane):
+            return struct.pack('<IIId',9000,1,0,120.) + b'\x03\x03' + struct.pack('<I',1) + struct.pack('<BBIBi',1,0,500,lane,-1)
+        with self.temporary() as temp:
+            root=Path(temp); folder=root/'charts';folder.mkdir()
+            (folder/'1.mc').write_bytes(self.data())
+            original=folder/'Exact Song.imd';original.write_bytes(binary(2))
+            row=dict(cid=1,server_hash='h',path='charts',mc_name='1.mc',title='Exact Song',keys=4)
+            catalogue=dict(server='fixture',charts=[row]);out=root/'out';state=root/'state'
+            self.assertEqual(publish(catalogue,root,out,state,FONT)['rendered'],1)
+            first=json.loads((out/'1.json').read_bytes())
+            self.assertEqual(first['notes'],1)
+            self.assertEqual(first['source_sha256'],hashlib.sha256(original.read_bytes()).hexdigest())
+            original.write_bytes(binary(3))
+            self.assertEqual(publish(catalogue,root,out,state,FONT)['rendered'],1)
+            self.assertNotEqual(first['source_sha256'],json.loads((out/'1.json').read_bytes())['source_sha256'])
+            original.unlink()
+            self.assertEqual(publish(catalogue,root,out,state,FONT)['rendered'],1)
+            self.assertEqual(json.loads((out/'1.json').read_bytes())['notes'],3)
+
     def test_bot_scope_and_digest(self):
         with self.temporary() as temp:
             root = Path(temp); data = b'\x89PNG\r\n\x1a\n' + b'synthetic'; digest = hashlib.sha256(data).hexdigest(); image = f'1-{digest}.png'; (root / image).write_bytes(data)

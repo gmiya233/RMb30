@@ -15,7 +15,7 @@ import re
 
 from PIL import Image, ImageDraw, ImageFont
 
-VERSION = 'rmvi-static-5-single-beat-sheet'
+VERSION = 'rmvi-static-6-imd-companion'
 SKIN = Path(__file__).parent / 'skin'
 MAX_BYTES = 16 * 1024 * 1024
 
@@ -76,6 +76,7 @@ class Chart:
     end: float
     has_effects: bool
     reordered_segments: bool = False
+    source_format: str = "MC"
 
     @property
     def beats_per_column(self):
@@ -224,7 +225,7 @@ def render(chart, metadata, font_path, page=1):
         draw.text((x, y), value, font=face, fill=color)
 
     label(24, 16, metadata.get('title') or '未命名歌曲', 32, '#ecf9ff', width - 48)
-    label(24, 62, f"{clean(metadata.get('version'))}  ·  {chart.keys}K  ·  CID {metadata.get('cid', '')}  ·  {len(chart.notes)} 音符  ·  全谱单图", 22, maximum=width - 48)
+    label(24, 62, f"{clean(metadata.get('version'))}  ·  {chart.keys}K  ·  CID {metadata.get('cid', '')}  ·  {len(chart.notes)} 音符  ·  {chart.source_format} · 全谱单图", 22, maximum=width - 48)
     label(24, 103, f'EX Rhythm Master VI · 从下往上，再向右读 · 每栏{beats_per_column // 4}小节 · 按节拍/分度排版', 18, '#94dce6', width - 48)
     for index in range(count):
         at = chart.first + (start_column + index) * beats_per_column

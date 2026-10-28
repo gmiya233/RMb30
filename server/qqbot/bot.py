@@ -88,11 +88,20 @@ def main():
                         # The official API supports file_data; the pinned SDK only wraps URL upload.
                         media = await self.http.request(Route('POST', '/v2/groups/{group_openid}/files', group_openid=message.group_openid),
                             json={'file_type': 1, 'file_data': base64.b64encode(reply).decode('ascii'), 'srv_send_msg': False})
+                        if not isinstance(media, dict) or not media.get('file_info'):
+                            raise TimeoutError('QQ image upload did not return media')
                         await self.api.post_group_message(group_openid=message.group_openid, msg_type=7, msg_id=message.id,
                                                           content=' ', media={'file_info': media['file_info']})
                     else:
                         await self.api.post_group_message(group_openid=message.group_openid, msg_type=0,
                                                           msg_id=message.id, content='\n' + reply[:1800])
+            except TimeoutError:
+                print('QQ query or image upload timed out; payload omitted', flush=True)
+                try:
+                    await self.api.post_group_message(group_openid=message.group_openid, msg_type=0, msg_id=message.id,
+                        msg_seq=2, content='\nQQ 图片上传超时，请稍后重试。')
+                except Exception:
+                    pass
             except Exception as error:
                 print('Query or reply failed (' + type(error).__name__ + ')', flush=True)
                 try:
@@ -105,7 +114,7 @@ def main():
             print('QQ event handler failed; event payload omitted', flush=True)
 
     # Suppress SDK payload logging: access tokens, messages and identifiers stay out of logs.
-    client = Client(intents=botpy.Intents(public_messages=True), is_sandbox=bool(config.get('sandbox', False)),
+    client = Client(timeout=30, intents=botpy.Intents(public_messages=True), is_sandbox=bool(config.get('sandbox', False)),
                     bot_log=False, ext_handlers=False)
     try:
         client.run(appid=str(config['appid']), secret=secret)

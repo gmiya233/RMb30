@@ -28,8 +28,21 @@ def source_file(root, row):
     return source
 
 
+def imd_source(root, row):
+    # The supplied skin opens an exact song/difficulty companion IMD first.
+    title = str(row.get('title', ''))
+    name = title + '.imd'
+    if any(c in name for c in '/\\:') or not title:
+        return None
+    try:
+        return source_file(root, dict(row, mc_name=name))
+    except FileNotFoundError:
+        return None
+
+
 def skin_revision():
     digest = hashlib.sha256(Path(__file__).with_name('render.py').read_bytes())
+    digest.update(Path(__file__).with_name('imd.py').read_bytes())
     for image in sorted(SKIN.glob('*.png')):
         digest.update(image.name.encode()); digest.update(image.read_bytes())
     return digest.hexdigest()
@@ -50,7 +63,10 @@ def publish(catalogue, source, output, state, font_path):
         manifest = output / f'{cid}.json'
         base = {'schema': 1, 'server': catalogue['server'], 'cid': cid, 'server_hash': row['server_hash'], 'skin': 'EX Rhythm Master VI', 'renderer': VERSION}
         try:
-            file = source_file(source, row); stat = file.stat()
+            file = source_file(source, row)
+            original = imd_source(source, row)
+            if original is not None: file = original
+            stat = file.stat()
             signature = hashlib.sha256(json.dumps([skin, stat.st_size, stat.st_mtime_ns, row], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
             active[str(cid)] = signature
             if stamps.get(str(cid)) == signature and manifest.exists():
@@ -63,7 +79,11 @@ def publish(catalogue, source, output, state, font_path):
             data = file.read_bytes()
             if len(data) > MAX_BYTES or (stat.st_size, stat.st_mtime_ns) != (file.stat().st_size, file.stat().st_mtime_ns):
                 raise ValueError('Chart changed during read')
-            chart = parse(data, row.get('keys'))
+            if original is not None:
+                from imd import parse_imd
+                chart = parse_imd(data, row.get('keys'))
+            else:
+                chart = parse(data, row.get('keys'))
             pages = []
             for page in range(1, chart.pages + 1):
                 image, (width, height) = render(chart, row, font_path, page)
