@@ -11,6 +11,7 @@ from ranking_queries import Queries
 from b30_commands import B30Commands, command_parts
 from song_search import SongSearch
 from chart_preview import ChartPreviews
+from markdown_probe import probe
 
 
 class Gate:
@@ -73,6 +74,12 @@ def main():
                 return
             try:
                 async with slots:
+                    if command_parts(message.content)[0] in ('markdown测试', 'md测试'):
+                        from botpy.http import Route
+                        async def send_probe(payload):
+                            return await self.http.request(Route('POST', '/v2/groups/{group_openid}/messages', group_openid=message.group_openid), json=payload)
+                        await probe(send_probe, message.id)
+                        return
                     if command_parts(message.content)[0] in b30.COMMANDS:
                         reply = await asyncio.wait_for(asyncio.to_thread(b30.execute, message.group_openid, message.author.member_openid, message.content), timeout=20)
                     elif command_parts(message.content)[0] in previews.COMMANDS:
