@@ -5,6 +5,10 @@ on:
     paths: ['ios/**', 'tools/prepare_ios_resources.py', 'tools/normalize_ios_images.swift', '.github/workflows/ios-test.yml']
   workflow_dispatch:
     inputs:
+      package_only:
+        description: Build device IPA without running tests
+        type: boolean
+        default: false
       startup_only:
         description: Check optimized startup with complete bundled resources
         type: boolean
@@ -27,6 +31,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Test shared Swift core
+        if: inputs.package_only != true
         run: swift test --package-path ios
       - name: Prepare app resources
         if: hashFiles('ios/project.yml') != ''
@@ -47,6 +52,7 @@ jobs:
           xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/ios-device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build | tee build/ios-build.log
           python3 tools/package_ios.py build/ios-device/Build/Products/Release-iphoneos/MalodyLink.app
       - name: Check normal Release startup with full catalogue
+        if: inputs.package_only != true
         run: |
           set -o pipefail
           xcodebuild -version
@@ -58,7 +64,7 @@ jobs:
         if: always() && hashFiles('build/iOS-Release-Startup.xcresult/Info.plist') != ''
         run: xcrun xcresulttool export attachments --path build/iOS-Release-Startup.xcresult --output-path build/ios-screenshots/release-startup
       - name: Check native navigation and local synthetic import on simulator
-        if: inputs.startup_only != true && hashFiles('ios/project.yml') != ''
+        if: inputs.package_only != true && inputs.startup_only != true && hashFiles('ios/project.yml') != ''
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"]))')
@@ -67,7 +73,7 @@ jobs:
           if [ "${{ inputs.layout_only }}" = "true" ]; then TEST_ARGS+=('-only-testing:MalodyLinkUITests/AppUITests/testLandscapeNavigation'); fi
           xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -parallel-testing-enabled NO "${TEST_ARGS[@]}" -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-UITests.xcresult test | tee build/ios-ui-tests.log
       - name: Check iPad navigation and layouts
-        if: inputs.startup_only != true
+        if: inputs.package_only != true && inputs.startup_only != true
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPad" in d["name"]))')
