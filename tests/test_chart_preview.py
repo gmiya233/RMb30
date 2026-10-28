@@ -50,6 +50,28 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(slow.spacing['clock'].seconds(1) - slow.spacing['clock'].seconds(0), 0.5)
         self.assertAlmostEqual(slow.spacing['clock'].seconds(33) - slow.spacing['clock'].seconds(32), 1 / 3)
 
+    @unittest.skipUnless(FONT, 'CJK font required')
+    def test_hold_is_orthogonal_with_terminal_arrow_only(self):
+        from PIL import Image
+        from io import BytesIO
+        data = {'meta': {'mode': 7}, 'time': [{'beat': [0, 0, 1], 'bpm': 120}], 'note': [
+            {'beat': [0, 0, 1], 'x': 31, 'w': 60, 'seg': [{'beat': [4, 0, 1], 'x': 128}, {'beat': [6, 0, 1], 'x': 64}]},
+            {'beat': [8, 0, 1], 'x': 95, 'w': 61, 'dir': 2}]}
+        chart = parse(json.dumps(data).encode(), 4)
+        png, _ = render(chart, {'cid': 1}, FONT); image = Image.open(BytesIO(png))
+        def green(x, y):
+            pixels = image.crop((round(x)-2, round(y)-2, round(x)+3, round(y)+3)).get_flattened_data()
+            return any(g > 150 and g > r*1.15 and g > b*1.15 for r, g, b in pixels)
+        def location(t, x): return 24+68+x/255*216, 180+8+chart.spacing['height']-t*150
+        self.assertTrue(green(*location(2, 31)), 'hold stays in its original lane')
+        self.assertFalse(green(*location(2, 95)), 'no diagonal interpolation through another lane')
+        x, y = location(4, 159)
+        self.assertFalse(green(x-13, y-9), 'intermediate bend has no arrow')
+        x, y = location(6, 95)
+        self.assertTrue(green(x+13, y-9), 'final left flick has an open chevron')
+        x, y = location(8, 95)
+        self.assertTrue(green(x+34, y), 'standalone shaft leaves the rectangle edge')
+
     def test_invalid_note_does_not_silently_disappear(self):
         doc = json.loads(self.data()); doc['note'][0]['x'] = 500
         with self.assertRaises(ValueError): parse(json.dumps(doc).encode())
