@@ -29,7 +29,8 @@ enum LocalPaths {
     }
     static func profile(_ qq: String) -> URL { base.appendingPathComponent("profiles", isDirectory: true).appendingPathComponent(qq.isEmpty ? "unbound" : qq, isDirectory: true).appendingPathComponent("state.json") }
     static var artwork: URL { base.appendingPathComponent("artwork", isDirectory: true) }
-    static func jacket(_ chart: Chart) -> URL { artwork.appendingPathComponent("\(chart.cid)-\(Digests.sha256(Data(chart.serverHash.utf8))).jpg") }
+    static func jacket(_ chart: Chart) -> URL { artwork.appendingPathComponent("server-v2-\(chart.cid)-\(Digests.sha256(Data(chart.serverHash.utf8))).jpg") }
+    static func importedJacket(_ chart: Chart) -> URL { artwork.appendingPathComponent("imported-\(chart.cid)-\(Digests.sha256(Data(chart.serverHash.utf8))).jpg") }
 }
 
 struct LocalState: Codable {
@@ -38,8 +39,9 @@ struct LocalState: Codable {
     var nickname = ""
     var title = ""
     var avatar: Data? = nil
+    var avatarDirty = false
     var replayJournal: [String: ReplayReceipt] = [:]
-    enum CodingKeys: String, CodingKey { case records, journal, nickname, title, avatar, replayJournal }
+    enum CodingKeys: String, CodingKey { case records, journal, nickname, title, avatar, avatarDirty, replayJournal }
     init() {}
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -48,6 +50,7 @@ struct LocalState: Codable {
         nickname = try c.decodeIfPresent(String.self, forKey: .nickname) ?? ""
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? ""
         avatar = try c.decodeIfPresent(Data.self, forKey: .avatar)
+        avatarDirty = try c.decodeIfPresent(Bool.self, forKey: .avatarDirty) ?? false
         replayJournal = try c.decodeIfPresent([String: ReplayReceipt].self, forKey: .replayJournal) ?? [:]
     }
 }

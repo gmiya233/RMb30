@@ -3,6 +3,8 @@ from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
 import re
+import json
+import hashlib
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -17,7 +19,16 @@ def font(path, size):
     return ImageFont.truetype(str(path), size=size)
 
 
-def render(doc, font_path, artwork_root=None):
+def render(doc, font_path, artwork_root=None, avatar_bytes=None):
+    canonical = {}
+    if artwork_root:
+        try:
+            index = Path(artwork_root) / 'v2/index.json'
+            if not index.is_symlink() and index.stat().st_size <= 4_000_000:
+                manifest = json.loads(index.read_bytes())
+                if manifest.get('schema') == 2 and manifest.get('server') == doc['server']: canonical = manifest['charts']
+        except (OSError, ValueError, KeyError):
+            pass
     image = Image.new('RGB', (W, H))
     # A deterministic pastel background keeps the exported image readable on phones.
     background = Image.new('RGB', (2, 2))
@@ -45,6 +56,15 @@ def render(doc, font_path, artwork_root=None):
     rounded((62, 60, 222, 220), '#d9f1ee', 16)
     draw.ellipse((116, 84, 170, 138), fill=TEAL)
     draw.rounded_rectangle((91, 147, 195, 200), radius=24, fill=TEAL)
+    if avatar_bytes:
+        try:
+            with Image.open(BytesIO(avatar_bytes)) as source:
+                if source.width * source.height <= 4_000_000:
+                    avatar = ImageOps.fit(ImageOps.exif_transpose(source).convert('RGB'), (160, 160))
+                    mask = Image.new('L', (160, 160)); ImageDraw.Draw(mask).rounded_rectangle((0, 0, 159, 159), radius=16, fill=255)
+                    image.paste(avatar, (62, 60), mask)
+        except (OSError, ValueError, Image.DecompressionBombError):
+            pass
     title = doc.get('player_title') or next((name for threshold, name in [(13, '龙币'), (12, '大师'), (11, '高手'), (10, '萌新')] if doc['rating'] >= threshold), '小师妹')
     rounded((246, 61, 1008, 107), '#fff4be', 8)
     label(263, 68, title, 27, width=720)
@@ -65,8 +85,9 @@ def render(doc, font_path, artwork_root=None):
             label(x + 16, y + 137, '同步成绩后收录最佳表现', 19, '#9aaeb5')
             return
         jacket = None
-        digests = row.get('artworks', [row.get('artwork', '')])
-        roots = [Path(artwork_root)] if artwork_root else []
+        current = canonical.get(str(row['cid']), {}).get('image', '')
+        digests = ([current] if current else []) + row.get('artworks', [row.get('artwork', '')])
+        roots = [Path(artwork_root) / 'v2', Path(artwork_root)] if artwork_root else []
         roots.append(Path('/var/lib/malody-qqbot/catalog-source/thumbs'))
         for digest in digests[:8]:
             if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest):
@@ -76,6 +97,8 @@ def render(doc, font_path, artwork_root=None):
                 try:
                     if path.is_symlink() or path.stat().st_size > 1048576:
                         raise ValueError('invalid artwork')
+                    if digest == current and hashlib.sha256(path.read_bytes()).hexdigest() != current:
+                        raise ValueError('artwork digest mismatch')
                     with Image.open(path) as source:
                         if source.width * source.height > 16_000_000:
                             raise ValueError('oversize artwork')

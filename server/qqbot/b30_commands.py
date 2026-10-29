@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -82,6 +83,8 @@ class B30Commands:
                         raise Unavailable('invalid score field')
             number(doc['updated'], upper=10000000000000)
             from b30_image import render
-            return render(doc, self.font, self.artwork)
+            from player_avatar import load
+            avatar = load(os.environ.get('MALODY_QQ_PROFILES', str(self.queries.root.parent.parent)), qq, doc['server'])
+            return render(doc, self.font, self.artwork, avatar)
         except (ValueError, KeyError, OSError, TypeError, AttributeError, json.JSONDecodeError):
             return 'B30暂时无法生成，请稍后再试。'

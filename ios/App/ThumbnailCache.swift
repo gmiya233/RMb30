@@ -5,7 +5,7 @@ import MalodyCore
 
 enum ThumbnailCache {
     static func copy(from folder: URL, names: [String], chart: Chart, permittedRoot: URL) {
-        let destination = LocalPaths.jacket(chart)
+        let destination = LocalPaths.importedJacket(chart)
         if FileManager.default.fileExists(atPath: destination.path) { return }
         for name in names {
             let clean = name.replacingOccurrences(of: "\\", with: "/")

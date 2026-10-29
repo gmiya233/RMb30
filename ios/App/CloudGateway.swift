@@ -46,6 +46,8 @@ struct RemoteBoard { let rows: [RankingRow]; let updated: Date; let failed: Int;
 actor CloudGateway {
     private let configuration: RankConfiguration
     private var token = ""
+    private var artIndex: [String: [String: String]] = [:]
+    private var artChecked = Date.distantPast
     func tokenValue() -> String { token }
     init(configuration: RankConfiguration) { self.configuration = configuration }
     var server: String { configuration.server.trimmingCharacters(in: CharacterSet(charactersIn: "/")) }
@@ -192,9 +194,38 @@ actor CloudGateway {
         return RemoteBoard(rows: rows, updated: Date(timeIntervalSince1970: updated / 1000), failed: document["failed"] as? Int ?? 0, cached: cached)
     }
     func artwork(_ chart: Chart) async throws -> Data {
-        let clean = chart.cover.replacingOccurrences(of: "\\", with: "/").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !clean.isEmpty, !clean.split(separator: "/").contains("..") else { throw MalodyError.invalid("曲绘未提供") }
-        let path = "/_song_art/\(Digests.sha256(Data(clean.utf8))).jpg"
-        return try await get(path, limit: 1_048_576)
+        if Date().timeIntervalSince(artChecked) > 300 {
+            let data = try await get("/_song_art/v2/index.json", limit: 4_000_000)
+            struct Index: Decodable { let schema: Int; let server: String; let charts: [String: [String: String]] }
+            let doc = try JSONDecoder().decode(Index.self, from: data)
+            guard doc.schema == 2, doc.server == server else { throw MalodyError.invalid("曲绘来源不匹配") }
+            artIndex = doc.charts; artChecked = Date()
+        }
+        guard let row = artIndex[String(chart.cid)], row["server_hash"] == chart.serverHash, let digest = row["image"], digest.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw MalodyError.invalid("曲绘与当前谱面不匹配") }
+        let path = LocalPaths.artwork.appendingPathComponent(digest + ".jpg")
+        if let data = try? Data(contentsOf: path), Digests.sha256(data) == digest { return data }
+        let data = try await get("/_song_art/v2/" + digest + ".jpg", limit: 1_048_576)
+        guard Digests.sha256(data) == digest else { throw MalodyError.invalid("曲绘校验失败") }
+        try? FileManager.default.createDirectory(at: LocalPaths.artwork, withIntermediateDirectories: true)
+        try? data.write(to: path, options: .atomic)
+        return data
+    }
+    func publishAvatar(qq: String, image: Data?) async throws {
+        _ = try JSONCoding.qq(qq); let data = image ?? Data()
+        guard data.count <= 1_048_576 else { throw MalodyError.invalid("头像过大") }
+        let doc: [String: Any] = ["schema": 1, "qq": qq, "server": server, "image": data.base64EncodedString(), "sha256": Digests.sha256(data)]
+        let bytes = try JSONSerialization.data(withJSONObject: doc, options: [.sortedKeys])
+        try await login(); _ = try checked(await api("/api/fs/mkdir", ["path": "/" + qq]))
+        let path = "/" + qq + "/player-avatar.json"
+        let result = try await HTTPBytes.request(URL(string: server + "/api/fs/put")!, method: "PUT", headers: ["Authorization": token, "Content-Type": "application/json", "File-Path": path, "As-Task": "false"], body: bytes, limit: 100_000)
+        _ = try checked(JSONSerialization.jsonObject(with: result) as? [String: Any] ?? [:])
+        guard try await get(path, limit: 1_500_000) == bytes else { throw MalodyError.invalid("头像回读未完成") }
+    }
+    func avatar(qq: String) async throws -> Data? {
+        _ = try JSONCoding.qq(qq)
+        struct Avatar: Decodable { let schema: Int; let qq: String; let server: String; let image: String; let sha256: String }
+        let doc = try JSONDecoder().decode(Avatar.self, from: await get("/" + qq + "/player-avatar.json", limit: 1_500_000))
+        guard doc.schema == 1, doc.qq == qq, doc.server == server, let bytes = Data(base64Encoded: doc.image), bytes.count <= 1_048_576, Digests.sha256(bytes) == doc.sha256 else { throw MalodyError.invalid("头像校验失败") }
+        return bytes.isEmpty ? nil : bytes
     }
 }

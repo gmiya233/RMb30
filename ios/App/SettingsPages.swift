@@ -50,7 +50,7 @@ struct SettingsPage: View {
                     TextField("昵称", text: $name).textFieldStyle(.roundedBorder).accessibilityLabel("本地昵称")
                     Picker("称号", selection: $title) { ForEach(model.titleOptions, id: \.key) { option in Text(option.name).tag(option.key) } }
                     Button("保存本地名片") { Task { await model.saveProfile(name: name, title: title) } }.frame(minHeight: 44)
-                    Text("头像保存在本机；称号按实际成绩解锁，绑定 QQ 后同步到云端及机器人 B30。").font(.caption).foregroundStyle(.secondary)
+                    Text("裁剪后先保存在本机；同步QQ云存档时上传头像，机器人B30会使用云端头像。称号按实际成绩解锁。").font(.caption).foregroundStyle(.secondary)
                 }
                 Card {
                     Text("关于").font(.headline)

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import MalodyCore
 
 @MainActor final class AppModel: ObservableObject {
@@ -159,7 +160,7 @@ import MalodyCore
     }
     func saveAvatar(_ bytes: Data?) async {
         guard !busy, ready, bytes == nil || bytes!.count <= 2_000_000 else { return }
-        var next = state; next.avatar = bytes
+        var next = state; next.avatar = bytes; next.avatarDirty = true
         do { try await store.save(next, qq: qq); state = next } catch { self.error = error.localizedDescription }
     }
     private func mergeCloud(upload: Bool) async throws {
@@ -174,6 +175,20 @@ import MalodyCore
             catch { status += "；称号同步未完成，下次上传将重试" }
             do { try await cloud.publishIndex(qq: profile, records: merged, catalogue: catalogue) }
             catch { status = "成绩已上传；兼容排行榜索引暂未更新，可稍后再同步" }
+        }
+        if upload && (state.avatar != nil || state.avatarDirty) {
+            do {
+                var bytes: Data?
+                if let raw = state.avatar, let image = UIImage(data: raw) {
+                    let format = UIGraphicsImageRendererFormat(); format.scale = 1
+                    let normalized = UIGraphicsImageRenderer(size: CGSize(width: 384, height: 384), format: format).image { _ in image.draw(in: CGRect(x: 0, y: 0, width: 384, height: 384)) }
+                    bytes = normalized.jpegData(compressionQuality: 0.85)
+                }
+                try await cloud.publishAvatar(qq: profile, image: bytes)
+                state.avatarDirty = false; try await store.save(state, qq: profile); status += "；头像已上传"
+            } catch { status += "；头像同步未完成，下次上传会重试" }
+        } else if !state.avatarDirty {
+            do { let bytes = try await cloud.avatar(qq: profile); if bytes == nil || UIImage(data: bytes!) != nil { state.avatar = bytes; try await store.save(state, qq: profile) } } catch { /* Old cloud archives may not include an avatar. */ }
         }
     }
     func syncCloud(upload: Bool) {
@@ -232,8 +247,7 @@ import MalodyCore
     }
     func art(_ chart: Chart) async -> Data? {
         let path = LocalPaths.jacket(chart)
-        if let bytes = try? Data(contentsOf: path) { return bytes }
-        guard let cloud, let bytes = try? await cloud.artwork(chart) else { return nil }
+        guard let cloud, let bytes = try? await cloud.artwork(chart) else { return try? Data(contentsOf: path) }
         try? FileManager.default.createDirectory(at: LocalPaths.artwork, withIntermediateDirectories: true)
         try? bytes.write(to: path, options: .atomic); return bytes
     }

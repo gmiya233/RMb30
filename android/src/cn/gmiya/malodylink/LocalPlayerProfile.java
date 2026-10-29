@@ -54,7 +54,7 @@ public final class LocalPlayerProfile {
     }
     public static void save(Context c,String name,Bitmap image,boolean changeAvatar)throws Exception {
         if(name.length()>40)throw new IOException("昵称最多40个字符");
-        if(changeAvatar){File f=avatar(c);if(!f.getParentFile().isDirectory()&&!f.getParentFile().mkdirs())throw new IOException("无法保存本地头像");AtomicFile atomic=new AtomicFile(f);
+        if(changeAvatar){android.content.SharedPreferences prefs=c.getSharedPreferences("appearance",0);prefs.edit().putLong("avatar_rev_"+key(c),prefs.getLong("avatar_rev_"+key(c),0)+1).commit();File f=avatar(c);if(!f.getParentFile().isDirectory()&&!f.getParentFile().mkdirs())throw new IOException("无法保存本地头像");AtomicFile atomic=new AtomicFile(f);
             if(image==null)atomic.delete();else{FileOutputStream out=null;try{out=atomic.startWrite();if(!image.compress(Bitmap.CompressFormat.PNG,100,out))throw new IOException("头像保存失败");atomic.finishWrite(out);}catch(Exception e){if(out!=null)atomic.failWrite(out);throw e;}}
         }
         if(!c.getSharedPreferences("appearance",0).edit().putString("name_"+key(c),name.trim()).commit())throw new IOException("昵称保存失败，请重试");

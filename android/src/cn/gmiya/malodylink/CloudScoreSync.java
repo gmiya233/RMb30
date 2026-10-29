@@ -26,7 +26,7 @@ public final class CloudScoreSync {
             CloudArchive.Result result=CloudArchive.sync(cached,qq,engine.server,engine.scores,engine.charts(),upload,progress::update);
             if(!qq.equals(ScoreStore.profile(context)))throw new IOException("QQ存档已切换，本次未写入本地成绩");
             ScoreStore.write(ScoreStore.file(context,engine.profile,"scores.json"),result.merged.scores);engine.scores=result.merged.scores;
-            String titleStatus="";if(upload)try{publishTitle(context,engine,source);titleStatus=" 称号已同步。";}catch(Exception titleFailure){titleStatus=" 称号同步未完成，下次上传会重试。";}
+            String titleStatus=CloudAvatar.sync(context,engine,source,upload);if(upload)try{publishTitle(context,engine,source);titleStatus+=" 称号已同步。";}catch(Exception titleFailure){titleStatus+=" 称号同步未完成，下次上传会重试。";}
             String ranking="";if(upload)try{RankingPublisher.publish(context,source,engine,progress);ranking=" 排行索引已更新。";}catch(Exception indexFailure){ranking=" 成绩已保存，排行索引更新未完成；下次合并同步会重试。";}
             String message=(upload?"云端合并完成":"云端拉取完成")+"：本机新增 "+result.downloaded+" 条，上传 "+result.uploaded+" 条，共 "+engine.scores.length()+" 条。"+
                 (result.merged.conflicts>0?" 同ID冲突 "+result.merged.conflicts+" 条，保留本机版本；云端原件保留。":"")+
