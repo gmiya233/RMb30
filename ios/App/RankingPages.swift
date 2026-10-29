@@ -3,14 +3,12 @@ import MalodyCore
 
 struct RankingPage: View {
     @EnvironmentObject var model: AppModel
+    @State private var extraRefresh = 0
     @AppStorage("show-hidden-creators") private var showHidden = false
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 NavigationLink { SongsPage().navigationTitle("选歌查看单曲榜") } label: { Label("单曲榜 · 选择歌曲", systemImage: "music.note.list").frame(maxWidth: .infinity, minHeight: 48) }.buttonStyle(.borderedProminent)
-                NavigationLink("累计活跃榜") { ExtraRankingPage(mode: 0) }
-                NavigationLink("近30天活跃榜") { ExtraRankingPage(mode: 1) }
-                NavigationLink("6K rating 排行") { ExtraRankingPage(mode: 2) }
                 Text(model.communityStatus).font(.caption).foregroundStyle(.secondary)
                 ForEach(CommunityDocument.sections, id: \.0) { section in
                     VStack(alignment: .leading, spacing: 10) {
@@ -24,10 +22,15 @@ struct RankingPage: View {
                         }
                         if rows(section.0).isEmpty { Text("暂无榜单数据").font(.caption).foregroundStyle(.secondary) }
                     }
+                    if section.0 == "total" {
+                        ExtraRankingStrip(mode: 2).id("six-" + String(extraRefresh))
+                        ExtraRankingStrip(mode: 1).id("month-" + String(extraRefresh))
+                        ExtraRankingStrip(mode: 0).id("total-" + String(extraRefresh))
+                    }
                 }
                 NavigationLink("查看实时总战力榜") { ChartRankingPage().onAppear { model.rankingCID = 0 } }.frame(minHeight: 44)
             }.padding(18).frame(maxWidth: 1000).frame(maxWidth: .infinity)
-        }.navigationTitle("排行榜").task { await model.loadCommunity() }.refreshable { await model.loadCommunity() }
+        }.navigationTitle("排行榜").task { await model.loadCommunity() }.refreshable { await model.loadCommunity(); extraRefresh += 1 }
         .navigationDestination(isPresented: Binding(get: { model.rankingCID != 0 }, set: { if !$0 { model.rankingCID = 0 } })) { ChartRankingPage() }
     }
     private func rows(_ key: String) -> [CommunityRow] { model.communityBoards?.boards[key == "creator_hot" && showHidden ? "creator_hot_all" : key] ?? [] }
