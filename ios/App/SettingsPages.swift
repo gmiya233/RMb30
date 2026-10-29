@@ -12,6 +12,7 @@ struct SettingsPage: View {
     @State private var name = ""
     @State private var title = ""
     @State private var photo: PhotosPickerItem?
+    @State private var avatarCrop: AvatarCropSelection?
     @State private var shareURL: URL?
     @State private var sharing = false
     @State private var updateStatus = ""
@@ -45,7 +46,7 @@ struct SettingsPage: View {
                 }
                 Card {
                     Text("本地名片").font(.headline)
-                    HStack { PlayerAvatar(data: model.state.avatar, side: 64); PhotosPicker(selection: $photo, matching: .images) { Label("选择头像", systemImage: "photo").frame(minHeight: 44) }; if model.state.avatar != nil { Button("移除") { Task { await model.saveAvatar(nil) } } } }
+                    HStack { PlayerAvatar(data: model.state.avatar, side: 64); PhotosPicker(selection: $photo, matching: .images) { Label("选择头像", systemImage: "photo").frame(minHeight: 44) }; if let data = model.state.avatar, let image = UIImage(data: data) { Button("裁剪") { avatarCrop = AvatarCropSelection(image: image, profile: model.qq) }.frame(minHeight: 44); Button("移除") { Task { await model.saveAvatar(nil) } } } }
                     TextField("昵称", text: $name).textFieldStyle(.roundedBorder).accessibilityLabel("本地昵称")
                     Picker("称号", selection: $title) { ForEach(model.titleOptions, id: \.key) { option in Text(option.name).tag(option.key) } }
                     Button("保存本地名片") { Task { await model.saveProfile(name: name, title: title) } }.frame(minHeight: 44)
@@ -64,11 +65,11 @@ struct SettingsPage: View {
         .disabled(model.busy || !model.ready)
         .onAppear { qq = model.qq; name = model.state.nickname; title = model.selectedTitleKey }
         .onChange(of: model.qq) { qq = $0 }
-        .onChange(of: photo) { selected in Task { if let data = try? await selected?.loadTransferable(type: Data.self), let image = UIImage(data: data) {
-            let size = CGSize(width: 384, height: 384)
-            let resized = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
-            await model.saveAvatar(resized.jpegData(compressionQuality: 0.85))
-        } } }
+        .onChange(of: photo) { selected in
+            let profile = model.qq
+            Task { if let data = try? await selected?.loadTransferable(type: Data.self), let image = UIImage(data: data), image.size.width > 0, image.size.height > 0, profile == model.qq { avatarCrop = AvatarCropSelection(image: image, profile: profile) } }
+        }
+        .sheet(item: $avatarCrop) { selection in AvatarCropEditor(selection: selection) }
         .sheet(isPresented: $chooseFolder) { FolderPicker { url in chooseFolder = false; model.chooseFolder(url) } }
         .sheet(isPresented: $sharing) { if let shareURL { ShareSheet(items: [shareURL]) } }
     }

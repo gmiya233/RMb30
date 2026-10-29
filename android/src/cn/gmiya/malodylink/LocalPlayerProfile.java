@@ -36,6 +36,10 @@ public final class LocalPlayerProfile {
     public static void saveTitle(Context c,Engine engine,String selected)throws Exception {if(!selected.isEmpty()&&!titleChoices(c,engine).containsKey(selected))throw new IOException("该称号尚未解锁，请重新选择");if(!c.getSharedPreferences("appearance",0).edit().putString("title_"+key(c),selected).putString("title_server_"+key(c),engine.server).commit())throw new IOException("称号保存失败");if(CloudScoreSync.automatic(c)&&!ScoreSyncGate.busy())try{CloudSyncService.request(c,true,true);}catch(RuntimeException pending){/* Kept locally; normal score upload retries. */}}
     public static Bitmap avatarBitmap(Context c){try(InputStream in=new AtomicFile(avatar(c)).openRead()){return BitmapFactory.decodeStream(in);}catch(Exception missing){return null;}}
     public static Bitmap prepareAvatar(InputStream stream)throws Exception {
+        Bitmap decoded=decodeAvatar(stream);
+        Bitmap square=Bitmap.createBitmap(512,512,Bitmap.Config.ARGB_8888);int side=Math.min(decoded.getWidth(),decoded.getHeight()),x=(decoded.getWidth()-side)/2,y=(decoded.getHeight()-side)/2;new Canvas(square).drawBitmap(decoded,new Rect(x,y,x+side,y+side),new Rect(0,0,512,512),new Paint(3));decoded.recycle();return square;
+    }
+    public static Bitmap decodeAvatar(InputStream stream)throws Exception {
         byte[] bytes=Engine.read(stream,12*1024*1024);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,bounds);
         if(bounds.outWidth<=0||bounds.outHeight<=0||bounds.outWidth>16384||bounds.outHeight>16384)throw new IOException("请选择有效图片，最长边不超过16384像素");
         Bitmap decoded;
@@ -46,7 +50,7 @@ public final class LocalPlayerProfile {
             Matrix matrix=new Matrix();switch(orientation){case 2:matrix.setScale(-1,1);break;case 3:matrix.setRotate(180);break;case 4:matrix.setScale(1,-1);break;case 5:matrix.setRotate(90);matrix.postScale(-1,1);break;case 6:matrix.setRotate(90);break;case 7:matrix.setRotate(-90);matrix.postScale(-1,1);break;case 8:matrix.setRotate(-90);break;}
             if(!matrix.isIdentity()){Bitmap rotated=Bitmap.createBitmap(decoded,0,0,decoded.getWidth(),decoded.getHeight(),matrix,true);if(rotated!=decoded)decoded.recycle();decoded=rotated;}
         }
-        Bitmap square=Bitmap.createBitmap(512,512,Bitmap.Config.ARGB_8888);int side=Math.min(decoded.getWidth(),decoded.getHeight()),x=(decoded.getWidth()-side)/2,y=(decoded.getHeight()-side)/2;new Canvas(square).drawBitmap(decoded,new Rect(x,y,x+side,y+side),new Rect(0,0,512,512),new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG));decoded.recycle();return square;
+        return decoded;
     }
     public static void save(Context c,String name,Bitmap image,boolean changeAvatar)throws Exception {
         if(name.length()>40)throw new IOException("昵称最多40个字符");

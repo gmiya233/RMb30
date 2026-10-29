@@ -55,6 +55,7 @@ struct HomePage: View {
     @EnvironmentObject var model: AppModel
     @State private var chooseFolder = false
     @State private var avatarPhoto: PhotosPickerItem?
+    @State private var avatarCrop: AvatarCropSelection?
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
@@ -100,16 +101,14 @@ struct HomePage: View {
         }
         .navigationTitle("我的节奏").navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $chooseFolder) { FolderPicker { url in chooseFolder = false; model.chooseFolder(url) } }
+        .sheet(item: $avatarCrop) { selection in AvatarCropEditor(selection: selection) }
         .onChange(of: avatarPhoto) { selected in
             let profile = model.qq
             Task {
                 do {
                     guard let data = try await selected?.loadTransferable(type: Data.self), let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else { return }
                     guard profile == model.qq else { return }
-                    let side: CGFloat = 384, scale = side / min(image.size.width, image.size.height)
-                    let rect = CGRect(x: (side-image.size.width*scale)/2, y: (side-image.size.height*scale)/2, width: image.size.width*scale, height: image.size.height*scale)
-                    let resized = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in image.draw(in: rect) }
-                    await model.saveAvatar(resized.jpegData(compressionQuality: 0.85))
+                    avatarCrop = AvatarCropSelection(image: image, profile: profile)
                 } catch { model.error = "无法读取这张头像，请重新选择" }
             }
         }

@@ -26,8 +26,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Malody Link
-        CFBundleShortVersionString: '0.3.5'
-        CFBundleVersion: '9'
+        CFBundleShortVersionString: '0.3.6'
+        CFBundleVersion: '10'
         LSRequiresIPhoneOS: true
         UILaunchScreen: {}
         UIRequiresFullScreen: false
