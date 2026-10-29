@@ -8,6 +8,7 @@ struct PosterCanvas: View {
     let player: String
     let title: String
     var avatar: Data? = nil
+    var six = false
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 5)
     var body: some View {
         VStack(spacing: 24) {
@@ -23,7 +24,7 @@ struct PosterCanvas: View {
                 VStack(spacing: 12) {
                     Text("节奏大师").font(.system(size: 62, weight: .heavy)).italic().foregroundStyle(Palette.accent)
                     Text("RHYTHM MASTER").font(.system(size: 21, weight: .semibold)).foregroundStyle(Palette.accent)
-                    VStack(spacing: 7) { Text("PLAYER RATING").font(.system(size: 20, weight: .semibold)); Text(board.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 48, weight: .bold)).foregroundStyle(.purple).monospacedDigit() }.frame(maxWidth: .infinity).padding(16).background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
+                    VStack(spacing: 7) { Text(six ? "6K RATING" : "PLAYER RATING").font(.system(size: 20, weight: .semibold)); Text(board.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 48, weight: .bold)).foregroundStyle(.purple).monospacedDigit() }.frame(maxWidth: .infinity).padding(16).background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
                 }.frame(width: 400)
             }
             section("O20", subtitle: "日常歌曲", entries: board.old, count: 20, rating: board.oldRating, color: Palette.accent)
@@ -74,17 +75,20 @@ struct B30Page: View {
     @State private var zooming = false
     @State private var choosingTitle = false
     @State private var demo = false
-    private var displayedBoard: ScoreBoard { demo ? ExamplePoster.board(model.catalogue) : model.previewBoard }
+    @State private var six = false
+    private var scopedCatalogue: Catalogue { Catalogue(server: model.catalogue.server, charts: model.catalogue.charts.filter { !six || $0.keys == 6 }) }
+    private var displayedBoard: ScoreBoard { demo ? ExamplePoster.board(scopedCatalogue) : ScoreBoard(records: model.state.records, catalogue: scopedCatalogue, preview: model.showingPreview ? model.preview : nil) }
     @State private var title = ""
     private var signature: String {
-        let rows = model.previewBoard.old + model.previewBoard.new
+        let rows = displayedBoard.old + displayedBoard.new
         let identity = rows.map { $0.record.id + $0.chart.title + $0.chart.levelLabel + $0.chart.keysLabel + String($0.rating) }.joined()
-        return String(demo) + identity + model.playerName + model.playerTitle + String(describing: model.preview) + String(model.showingPreview) + String(model.state.avatar?.hashValue ?? 0)
+        return String(six) + String(demo) + identity + model.playerName + model.playerTitle + String(describing: model.preview) + String(model.showingPreview) + String(model.state.avatar?.hashValue ?? 0)
     }
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
                 Button { model.syncCloud(upload: true) } label: { Label("上传成绩到服务器和排行榜", systemImage: "icloud.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.borderedProminent).tint(.green).disabled(model.busy || !model.ready)
+                Picker("成绩图范围", selection: $six) { Text("全部 B30").tag(false); Text("6K B30").tag(true) }.pickerStyle(.segmented)
                 Toggle("查看示例布局", isOn: $demo)
                 if demo { Text("示例成绩，仅用于查看排版，不参与同步与排行").font(.caption).foregroundStyle(.orange) }
                 RatingPreviewControls()
@@ -113,7 +117,7 @@ struct B30Page: View {
         generating = true; defer { generating = false }
         for row in displayedBoard.old + displayedBoard.new { if Task.isCancelled { return }; _ = await model.art(row.chart) }
         guard !Task.isCancelled else { return }
-        let renderer = ImageRenderer(content: PosterCanvas(board: displayedBoard, player: demo ? "示例玩家 · DEMO" : model.playerName, title: demo ? "示例布局" : model.playerTitle, avatar: demo ? nil : model.state.avatar)); renderer.scale = 1
+        let renderer = ImageRenderer(content: PosterCanvas(board: displayedBoard, player: demo ? "示例玩家 · DEMO" : model.playerName, title: demo ? "示例布局" : model.playerTitle, avatar: demo ? nil : model.state.avatar, six: six)); renderer.scale = 1
         image = renderer.uiImage
     }
 }

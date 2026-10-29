@@ -45,7 +45,7 @@ public final class ScorePoster {
         text("rating",296,257,25,0xff52758b,false);text(String.format(Locale.ROOT,"%.4f",b.rating()),389,258,34,0xff168c9f,true);
         text("O "+b.old.size()+"/20   N "+b.fresh.size()+"/10",664,256,24,0xff52758b,true);logo();
         rect(1017,192,395,99,0x665b65b4,22);rect(1008,183,395,99,0xffe9dcfa,22);rect(1015,189,381,84,0xf5ffffff,18);
-        text("PLAYER RATING",1075,216,20,0xff8065a6,true);text(String.format(Locale.ROOT,"%.4f",b.rating()),1082,261,47,0xff9f459e,true);
+        text(b.keys==6?"6K RATING":"PLAYER RATING",1075,216,20,0xff8065a6,true);text(String.format(Locale.ROOT,"%.4f",b.rating()),1082,261,47,0xff9f459e,true);
         if(b.demo)text("示例数据",793,64,17,0xffa5267c,true);
     }
     private void section(String group,String subtitle,List<PosterData.Entry> entries,int capacity,float y,int accent){

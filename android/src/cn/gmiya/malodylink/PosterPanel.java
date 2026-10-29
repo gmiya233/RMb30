@@ -22,7 +22,7 @@ public final class PosterPanel extends ContextWrapper {
     private boolean isDestroyed(){return host.isDestroyed();}
     public void close(){closed=true;if(receiverRegistered){unregisterReceiver(uploads);receiverRegistered=false;}if(preview!=null)preview.setBitmap(null);image=null;}
     private Engine engine;private Bitmap image;private PosterPreviewView preview;private TextView hint;
-    private boolean demo;private int judgeOverride=0;private RatingRules rules;
+    private boolean six;private boolean demo;private int judgeOverride=0;private RatingRules rules;
     private PosterData.Board board;private boolean rendering=false,saving=false;
     private final int BG=AppUi.BG,INK=AppUi.INK,MUTED=AppUi.MUTED;
     private int dp(float x){return (int)(x*getResources().getDisplayMetrics().density+.5f);}
@@ -38,6 +38,7 @@ public final class PosterPanel extends ContextWrapper {
         titleBar=bar;view.addView(bar);
         uploadButton=new Button(this);uploadButton.setText("上传成绩到服务器和排行榜");uploadButton.setTextSize(16);uploadButton.setAllCaps(false);uploadButton.setMinHeight(dp(52));uploadButton.setTextColor(AppUi.ON_SUCCESS);uploadButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(AppUi.SUCCESS));uploadButton.setOnClickListener(v->uploadScores());view.addView(uploadButton,new LinearLayout.LayoutParams(-1,-2));
         uploadStatus=text("",12,MUTED);uploadStatus.setMaxLines(2);uploadStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);view.addView(uploadStatus);updateUploadState();
+        CheckBox sixToggle=new CheckBox(this);sixToggle.setText("6K B30（仅6K谱面）");sixToggle.setTextColor(INK);sixToggle.setChecked(six);view.addView(sixToggle);sixToggle.setOnCheckedChangeListener((b,on)->{if(rendering||saving){sixToggle.setChecked(six);return;}six=on;redraw();});
         LinearLayout actions=new LinearLayout(this);actions.setGravity(Gravity.CENTER_VERTICAL);actions.setPadding(0,dp(4),0,dp(8));
         iconButton(actions,"保存到相册",3,this::save);iconButton(actions,"选择称号",6,this::chooseTitle);iconButton(actions,"调整与示例",7,this::options);iconButton(actions,"放大 / 适应屏幕",8,()->preview.toggleZoom());view.addView(actions);
         hint=text("正在生成成绩图…",12,MUTED);hint.setMaxLines(3);hint.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);view.addView(hint);
@@ -64,9 +65,9 @@ public final class PosterPanel extends ContextWrapper {
         }).setNegativeButton("取消",null).show();
     }
     private void redraw(){if(rendering||saving||engine==null)return;rendering=true;feedback("正在排版…");
-        new Thread(()->{try{PosterData.Board next=PosterData.load(this,engine,demo,rules,judgeOverride);Bitmap bitmap=new ScorePoster(this).render(next);
+        new Thread(()->{try{PosterData.Board next=PosterData.loadKeys(this,engine,demo,rules,judgeOverride,six?6:0);Bitmap bitmap=new ScorePoster(this).render(next);
             // Cache is only a preview/export artifact; raw imported scores are untouched.
-            try(FileOutputStream out=new FileOutputStream(new File(getCacheDir(),demo?"score-poster-demo.png":"score-poster-real.png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}
+            try(FileOutputStream out=new FileOutputStream(new File(getCacheDir(),six?"score-poster-6k.png":demo?"score-poster-demo.png":"score-poster-real.png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}
             runOnUiThread(()->{rendering=false;if(isFinishing()||isDestroyed()){bitmap.recycle();return;}Bitmap previous=image;image=bitmap;board=next;preview.setBitmap(image);if(previous!=null)previous.recycle();
                 feedback("");});
         }catch(Exception e){runOnUiThread(()->{rendering=false;feedback("排版失败："+e.getMessage());});}}).start();

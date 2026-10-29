@@ -68,10 +68,11 @@ public struct ScoreBoard {
     public var oldRating: Double { old.reduce(0) { $0 + $1.rating } / 20 }
     public var newRating: Double { new.reduce(0) { $0 + $1.rating } / 10 }
     public var rating: Double { (old.reduce(0) { $0 + $1.rating } + new.reduce(0) { $0 + $1.rating }) / 30 }
-    public init(records: [ScoreRecord], catalogue: Catalogue, preview: RatingPreview? = nil) {
-        let charts = catalogue.byCID, promoted = catalogue.promotedSongs
+    public init(records: [ScoreRecord], catalogue: Catalogue, preview: RatingPreview? = nil, keys: Int? = nil) {
+        let effectiveCatalogue = keys.map { key in Catalogue(server: catalogue.server, charts: catalogue.charts.filter { $0.keys == key }) } ?? catalogue
+        let charts = effectiveCatalogue.byCID, promoted = effectiveCatalogue.promotedSongs
         var songs: [String: RatedScore] = [:]
-        for record in catalogue.filtered(records) {
+        for record in effectiveCatalogue.filtered(records) {
             guard let chart = charts[record.cid], let rating = preview == nil ? Rating.score(chart: chart, record: record) : preview!.value(chart: chart, record: record) else { continue }
             var row = RatedScore(chart: chart, record: record, rating: rating, isNew: promoted.contains(chart.identity))
             if let preview {

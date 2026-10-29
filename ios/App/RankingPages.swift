@@ -8,6 +8,9 @@ struct RankingPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 NavigationLink { SongsPage().navigationTitle("选歌查看单曲榜") } label: { Label("单曲榜 · 选择歌曲", systemImage: "music.note.list").frame(maxWidth: .infinity, minHeight: 48) }.buttonStyle(.borderedProminent)
+                NavigationLink("累计活跃榜") { ExtraRankingPage(mode: 0) }
+                NavigationLink("近30天活跃榜") { ExtraRankingPage(mode: 1) }
+                NavigationLink("6K rating 排行") { ExtraRankingPage(mode: 2) }
                 Text(model.communityStatus).font(.caption).foregroundStyle(.secondary)
                 ForEach(CommunityDocument.sections, id: \.0) { section in
                     VStack(alignment: .leading, spacing: 10) {

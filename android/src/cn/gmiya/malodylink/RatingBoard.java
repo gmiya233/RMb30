@@ -13,7 +13,7 @@ public class RatingBoard {
     }
     public static class Board {
         public List<Entry> old=new ArrayList<>(),fresh=new ArrayList<>();
-        public String player="PLAYER",title="";public boolean demo;public int allCount;
+        public String player="PLAYER",title="";public boolean demo;public int keys,allCount;
         public int count(){return old.size()+fresh.size();}
         public double oldRating(){return average(old,20);}
         public double newRating(){return average(fresh,10);}

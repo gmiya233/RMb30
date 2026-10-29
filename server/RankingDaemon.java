@@ -123,8 +123,8 @@ public final class RankingDaemon {
             for(Map.Entry<Integer,JSONArray> entry:singles.entrySet())atomic(output.resolve("charts/"+entry.getKey()+".json"),snapshot(server,revision,entry.getKey(),entry.getValue(),updated,failed,ids.size()));
             JSONArray activity=new JSONArray(),sixTotals=new JSONArray();long cutoff=updated/1000-30L*86400;
             for(RankingData.Player p:next.values()){JSONObject extra=extras.get(p.qq);if(extra==null)continue;
-                JSONArray times=extra.optJSONArray("recent_times");int month=0;if(times!=null)for(int i=0;i<times.length();i++)if(times.optLong(i)>=cutoff&&times.optLong(i)<=updated/1000)month++;
-                activity.put(new JSONObject().put("qq",p.qq).put("name",p.name).put("total",extra.optInt("plays_total")).put("month",month));
+                JSONArray times=extra.optJSONArray("recent_times");int month=0,today=0;long dayStart=((updated/1000+28800)/86400)*86400-28800;if(times!=null)for(int i=0;i<times.length();i++)if(times.optLong(i)>=cutoff&&times.optLong(i)<=updated/1000){month++;if(times.optLong(i)>=dayStart)today++;}
+                activity.put(new JSONObject().put("qq",p.qq).put("name",p.name).put("total",extra.optInt("plays_total")).put("month",month).put("today",today));
                 JSONObject six=extra.optJSONObject("six");if(six!=null&&(six.optInt("oc")+six.optInt("nc"))>0)sixTotals.put(new JSONObject(six.toString()).put("name",p.name).put("best",new JSONArray()));
             }
             atomic(output.resolve("activity.json"),snapshot(server,revision,0,activity,updated,failed,ids.size()));

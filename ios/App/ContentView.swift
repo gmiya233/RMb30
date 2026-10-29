@@ -63,6 +63,7 @@ struct HomePage: View {
                     Divider()
                     HStack { PlayerAvatar(data: model.state.avatar, side: 40); Text(model.playerName + " · " + model.playerTitle).font(.subheadline) }
                 }
+                MyActivityCard()
                 RatingPreviewControls()
                 Card {
                     if model.busy { ProgressView().accessibilityLabel("正在处理") }
