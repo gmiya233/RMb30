@@ -4,8 +4,6 @@ import MalodyCore
 struct RankingPage: View {
     @EnvironmentObject var model: AppModel
     @State private var category = "total"
-    @State private var activityPeriod = "activity_month"
-    @State private var communityKind = "song_hot"
     @State private var extra: [String: [ExtraRow]] = [:]
     @State private var extraStatus = "正在读取云端…"
     @AppStorage("show-hidden-creators") private var showHidden = false
@@ -16,13 +14,18 @@ struct RankingPage: View {
                 Spacer()
                 Button { Task { await refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 44, height: 44) }.accessibilityLabel("刷新榜单")
             }
-            Picker("榜单分类", selection: $category) {
-                Text("总战力").tag("total"); Text("6K").tag("six_k"); Text("活跃度").tag("activity"); Text("更多").tag("community")
-            }.pickerStyle(.segmented)
-            if category == "activity" {
-                Picker("活跃度周期", selection: $activityPeriod) { Text("近30天").tag("activity_month"); Text("累计").tag("activity_total") }.pickerStyle(.segmented)
-            } else if category == "community" {
-                Picker("歌曲与谱师榜单", selection: $communityKind) { ForEach(Array(CommunityDocument.sections.dropFirst()), id: \.0) { Text($0.1).tag($0.0) } }
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(categories, id: \.0) { item in
+                            Button { category = item.0 } label: {
+                                Text(item.1).font(.subheadline.weight(category == item.0 ? .semibold : .regular)).lineLimit(1).fixedSize(horizontal: true, vertical: false).padding(.horizontal, 16).frame(minHeight: 48)
+                                    .foregroundStyle(category == item.0 ? Palette.accent : Color.secondary)
+                                    .background(category == item.0 ? Palette.selected : Color.clear, in: RoundedRectangle(cornerRadius: 16))
+                            }.buttonStyle(.plain).accessibilityAddTraits(category == item.0 ? .isSelected : []).id(item.0)
+                        }
+                    }
+                }.accessibilityLabel("榜单分类，左右滑动查看更多").onChange(of: category) { value in withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo(value, anchor: .center) } }
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -49,7 +52,8 @@ struct RankingPage: View {
         .navigationDestination(isPresented: Binding(get: { model.rankingCID != 0 }, set: { if !$0 { model.rankingCID = 0 } })) { ChartRankingPage() }
     }
     private func rows(_ key: String) -> [CommunityRow] { model.communityBoards?.boards[key == "creator_hot" && showHidden ? "creator_hot_all" : key] ?? [] }
-    private var boardID: String { category == "activity" ? activityPeriod : category == "community" ? communityKind : category }
+    private let categories = [("total", "总战力"), ("six_k", "6K rating"), ("activity_month", "近30天活跃"), ("activity_total", "累计活跃"), ("song_hot", "歌曲热度"), ("song_good", "歌曲好评"), ("creator_hot", "谱师热度"), ("creator_good", "谱师好评")]
+    private var boardID: String { category }
     private var isExtra: Bool { boardID == "six_k" || boardID.hasPrefix("activity_") }
     private var isPlayer: Bool { boardID == "total" || isExtra }
     private var boardTitle: String { boardID == "six_k" ? "6K rating 排行" : boardID == "activity_month" ? "近30天活跃榜" : boardID == "activity_total" ? "累计活跃榜" : CommunityDocument.sections.first { $0.0 == boardID }?.1 ?? "排行榜" }
