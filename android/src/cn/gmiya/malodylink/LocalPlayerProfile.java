@@ -13,6 +13,11 @@ import java.util.*;
 
 /** Nickname/avatar are local; the selected unlocked title can sync separately. */
 public final class LocalPlayerProfile {
+    public static android.content.Intent avatarPicker(Context context){
+        android.content.Intent picker=new android.content.Intent(Build.VERSION.SDK_INT>=33?android.provider.MediaStore.ACTION_PICK_IMAGES:android.content.Intent.ACTION_PICK).setType("image/*");
+        if(picker.resolveActivity(context.getPackageManager())==null)picker=new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(android.content.Intent.CATEGORY_OPENABLE);
+        return picker;
+    }
     public static final String DEFAULT_TITLE="小师妹";
     public static String ratingTitle(double rating){if(!Double.isFinite(rating)||rating<10)return DEFAULT_TITLE;if(rating<11)return "萌新";if(rating<12)return "高手";if(rating<13)return "大师";return "龙币";}
     public static Map<String,String> ratingTitles(double rating){Map<String,String> choices=new LinkedHashMap<>();choices.put("rank:0",DEFAULT_TITLE);String[] titles={"萌新","高手","大师","龙币"};for(int i=0;i<titles.length;i++)if(Double.isFinite(rating)&&rating>=10+i)choices.put("rank:"+(10+i),titles[i]);return choices;}

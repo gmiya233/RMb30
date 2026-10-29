@@ -9,11 +9,6 @@ struct RankingPage: View {
     @AppStorage("show-hidden-creators") private var showHidden = false
     var body: some View {
         VStack(spacing: 12) {
-            HStack {
-                NavigationLink { SongsPage().navigationTitle("选歌查看单曲榜") } label: { Label("单曲榜", systemImage: "music.note.list").frame(minHeight: 44) }
-                Spacer()
-                Button { Task { await refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 44, height: 44) }.accessibilityLabel("刷新榜单")
-            }
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
@@ -49,6 +44,12 @@ struct RankingPage: View {
             if isPlayer { myPosition }
         }.padding(.horizontal, 18).frame(maxWidth: 760).frame(maxWidth: .infinity)
         .navigationTitle("排行榜").task { await refresh() }
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                NavigationLink { SongsPage().navigationTitle("选歌查看单曲榜") } label: { Image(systemName: "music.note.list").frame(width: 44, height: 44) }.accessibilityLabel("选歌查看单曲榜")
+                Button { Task { await refresh() } } label: { Image(systemName: "arrow.clockwise").frame(width: 44, height: 44) }.accessibilityLabel("刷新榜单")
+            }
+        }
         .navigationDestination(isPresented: Binding(get: { model.rankingCID != 0 }, set: { if !$0 { model.rankingCID = 0 } })) { ChartRankingPage() }
     }
     private func rows(_ key: String) -> [CommunityRow] { model.communityBoards?.boards[key == "creator_hot" && showHidden ? "creator_hot_all" : key] ?? [] }

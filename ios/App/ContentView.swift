@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 import MalodyCore
 
 struct RootView: View {
@@ -53,12 +54,13 @@ struct Card<Content: View>: View {
 struct HomePage: View {
     @EnvironmentObject var model: AppModel
     @State private var chooseFolder = false
+    @State private var avatarPhoto: PhotosPickerItem?
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 12) {
-                        Button { model.selectedTab = 4 } label: { PlayerAvatar(data: model.state.avatar, side: 48).padding(3).background(Palette.selected, in: RoundedRectangle(cornerRadius: 14)) }.buttonStyle(.plain).accessibilityLabel("设置本地头像与昵称")
+                        PhotosPicker(selection: $avatarPhoto, matching: .images) { PlayerAvatar(data: model.state.avatar, side: 48).padding(3).background(Palette.selected, in: RoundedRectangle(cornerRadius: 14)) }.buttonStyle(.plain).accessibilityLabel("从本地相册选择头像").disabled(model.busy || !model.ready)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(model.playerTitle).font(.caption).foregroundStyle(.white.opacity(0.9)).lineLimit(2)
                             Text(model.playerName).font(.title3.bold()).foregroundStyle(.white).lineLimit(2)
@@ -98,6 +100,19 @@ struct HomePage: View {
         }
         .navigationTitle("我的节奏").navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $chooseFolder) { FolderPicker { url in chooseFolder = false; model.chooseFolder(url) } }
+        .onChange(of: avatarPhoto) { selected in
+            let profile = model.qq
+            Task {
+                do {
+                    guard let data = try await selected?.loadTransferable(type: Data.self), let image = UIImage(data: data), image.size.width > 0, image.size.height > 0 else { return }
+                    guard profile == model.qq else { return }
+                    let side: CGFloat = 384, scale = side / min(image.size.width, image.size.height)
+                    let rect = CGRect(x: (side-image.size.width*scale)/2, y: (side-image.size.height*scale)/2, width: image.size.width*scale, height: image.size.height*scale)
+                    let resized = UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { _ in image.draw(in: rect) }
+                    await model.saveAvatar(resized.jpegData(compressionQuality: 0.85))
+                } catch { model.error = "无法读取这张头像，请重新选择" }
+            }
+        }
     }
     private func metric(_ label: String, _ count: Int, _ slots: Int) -> some View { VStack(alignment: .leading) { Text(label).font(.caption).foregroundStyle(.secondary); Text("\(count) / \(slots)").font(.title3.bold()).monospacedDigit() } }
     private func action(_ title: String, _ icon: String, _ action: @escaping () -> Void) -> some View { Button(action: action) { Label(title, systemImage: icon).font(.subheadline).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.bordered).disabled(model.busy || !model.ready) }
