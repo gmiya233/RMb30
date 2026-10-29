@@ -12,6 +12,20 @@ from publish_catalogue import public_catalogue
 
 
 class BotTests(unittest.TestCase):
+    def test_activity_and_six_k_commands(self):
+        base=json.loads((self.directory/'rt.json').read_bytes())
+        six=dict(base);six['players']=[dict(base['players'][0],rating=1.25,o=1.5,n=.75)]
+        self.write(self.directory/'6k.json',six)
+        self.assertIn('6K 综合',self.query.execute('6K榜'))
+        self.assertIn('1.2500',self.query.execute('6K榜'))
+        activity=dict(base);activity['players']=[dict(qq='10001',name='A',total=20,month=2),dict(qq='10002',name='B',total=5,month=4)]
+        self.write(self.directory/'activity.json',activity)
+        self.assertIn('1. A · 20次',self.query.execute('活跃榜 累计'))
+        self.assertIn('1. B · 4次',self.query.execute('活跃榜 月'))
+        self.assertIn('近30天',self.query.execute('月活跃榜'))
+        activity['server']='other';self.write(self.directory/'activity.json',activity)
+        self.assertIn('暂时不可用',self.query.execute('活跃榜'))
+
     def setUp(self):
         temporary_root = Path(__file__).resolve().parents[1] / 'build' / 'qqbot-tests'
         temporary_root.mkdir(parents=True, exist_ok=True)

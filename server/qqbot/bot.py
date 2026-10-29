@@ -13,6 +13,7 @@ from song_search import SongSearch
 from chart_preview import ChartPreviews
 from markdown_probe import probe
 from button_menu import COMMANDS as MENU_COMMANDS, send_menu
+from recommendations import Recommendations, COMMANDS as RECOMMEND_COMMANDS
 
 
 class Gate:
@@ -63,10 +64,46 @@ def main():
     previews = ChartPreviews(queries, config.get('chart_previews', '/var/lib/malody-qqbot/chart-previews'))
     slots = asyncio.Semaphore(8)
     allowed = set(config.get('allowed_groups', []))
+    recommendations = Recommendations(queries, b30.font, song_search.roots, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'recommendations.sqlite3')
 
     class Client(botpy.Client):
+        async def send_card(self, group, image, message_id=None):
+            from botpy.http import Route
+            if not 0 < len(image) <= 4 * 1024 * 1024:
+                raise ValueError('Image exceeds upload limit')
+            media = await self.http.request(Route('POST', '/v2/groups/{group_openid}/files', group_openid=group),
+                json={'file_type':1, 'file_data':base64.b64encode(image).decode('ascii'), 'srv_send_msg':False})
+            if not isinstance(media,dict) or not media.get('file_info'):
+                raise TimeoutError('Image upload acknowledgement missing')
+            payload={'msg_type':7, 'content':' ', 'media':{'file_info':media['file_info']}}
+            if message_id: payload.update(msg_id=message_id,msg_seq=1)
+            result=await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=payload)
+            if not isinstance(result,dict) or not result.get('id'):
+                raise TimeoutError('Image message acknowledgement missing')
+
+        async def recommendation_loop(self):
+            while True:
+                try:
+                    groups=await asyncio.to_thread(recommendations.due,allowed)
+                    for group in groups:
+                        ok=False
+                        try:
+                            async with slots:
+                                image=await asyncio.wait_for(asyncio.to_thread(recommendations.card,group),timeout=30)
+                                await self.send_card(group,image)
+                                ok=True
+                                print('Scheduled recommendation: accepted',flush=True)
+                        except Exception as error:
+                            print('Scheduled recommendation: failed ('+type(error).__name__+')',flush=True)
+                        await asyncio.to_thread(recommendations.finish,group,ok)
+                except Exception as error:
+                    print('Recommendation scheduler: failed ('+type(error).__name__+')',flush=True)
+                await asyncio.sleep(30)
+
         async def on_ready(self):
             print('QQ bot connected; read-only ranking queries ready', flush=True)
+            if not getattr(self,'recommendation_task',None) or self.recommendation_task.done():
+                self.recommendation_task=asyncio.create_task(self.recommendation_loop())
 
         async def on_group_at_message_create(self, message):
             if allowed and message.group_openid not in allowed:
@@ -75,6 +112,31 @@ def main():
                 return
             try:
                 async with slots:
+                    command, argument = command_parts(message.content)
+                    if command in RECOMMEND_COMMANDS:
+                        group=message.group_openid
+                        if command == '关闭推荐':
+                            reply=await asyncio.to_thread(recommendations.disable,group)
+                        elif command == '推荐状态':
+                            reply=await asyncio.to_thread(recommendations.status,group)
+                        elif command == '开启推荐':
+                            # Send without msg_id to verify real proactive delivery first.
+                            try:
+                                image=await asyncio.wait_for(asyncio.to_thread(recommendations.card,group),timeout=30)
+                                await self.send_card(group,image)
+                            except Exception as error:
+                                print('Enable recommendation: proactive probe failed ('+type(error).__name__+')',flush=True)
+                                reply='自动推荐尚未开启：主动发送未成功。请在QQ群机器人设置允许主动推送后重试；仍可发送“歌曲推荐”手动查询。'
+                            else:
+                                reply=await asyncio.to_thread(recommendations.enable,group)
+                                print('Enable recommendation: proactive delivery accepted; schedule enabled',flush=True)
+                        else:
+                            image=await asyncio.wait_for(asyncio.to_thread(recommendations.card,group),timeout=30)
+                            await self.send_card(group,image,message.id)
+                            print('Manual recommendation: accepted',flush=True)
+                            return
+                        await self.api.post_group_message(group_openid=group,msg_type=0,msg_id=message.id,content='\n'+reply)
+                        return
                     if command_parts(message.content)[0] in MENU_COMMANDS:
                         from botpy.http import Route
                         async def send_menu_reply(payload):

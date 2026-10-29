@@ -14,6 +14,7 @@ public final class RankingDaemon {
     private final Map<String,String> signatures=new HashMap<>();
     private String loadedRevision="";
     private long published;
+    private final Map<String,JSONObject> extras=new TreeMap<>();
     public RankingDaemon(Path root,Path catalogue,Path state)throws Exception {
         this.root=root.toRealPath();this.catalogue=catalogue;this.state=state;Files.createDirectories(state);
         if(state.toAbsolutePath().normalize().startsWith(this.root))throw new IOException("Private state must be outside the archive root");
@@ -60,8 +61,8 @@ public final class RankingDaemon {
         JSONObject doc=new JSONObject(new String(read(catalogue,16*1024*1024),StandardCharsets.UTF_8));
         String server=doc.getString("server");JSONArray charts=doc.getJSONArray("charts");String revision=RankingIndex.revision(server,charts);
         if(!revision.equals(loadedRevision)){
-            previous.clear();signatures.clear();loadedRevision=revision;Path saved=state.resolve(revision+".json");
-            if(Files.exists(saved)){JSONObject old=new JSONObject(new String(read(saved,16*1024*1024),StandardCharsets.UTF_8));JSONArray rows=old.getJSONArray("players");for(int i=0;i<rows.length();i++){RankingData.Player p=RankingData.decode(rows.getJSONObject(i));previous.put(p.qq,p);}}
+            previous.clear();extras.clear();signatures.clear();loadedRevision=revision;Path saved=state.resolve(revision+".json");
+            if(Files.exists(saved)){JSONObject old=new JSONObject(new String(read(saved,16*1024*1024),StandardCharsets.UTF_8));JSONArray rows=old.getJSONArray("players");for(int i=0;i<rows.length();i++){RankingData.Player p=RankingData.decode(rows.getJSONObject(i));previous.put(p.qq,p);JSONObject extra=rows.getJSONObject(i).optJSONObject("extra_boards");if(extra!=null)extras.put(p.qq,extra);}}
         }
         CloudArchive.Remote source=history();Set<String> ids=new TreeSet<>();for(String id:children(root,true))if(id.matches("[1-9][0-9]{4,11}"))ids.add(id);
         ids.addAll(previous.keySet());int changed=0,failed=0,verified=0;Map<String,RankingData.Player> next=new TreeMap<>();
@@ -72,11 +73,17 @@ public final class RankingDaemon {
         for(String qq:ids){try{
             Path folder=root.resolve(qq);if(!Files.isDirectory(folder))throw new IOException("Archive unavailable");
             List<String> names=source.list(qq,false);String stamp=signature(qq,names);RankingData.Player player=previous.get(qq);
-            if(player==null||!stamp.equals(signatures.get(qq))){
+            if(player==null||!extras.containsKey(qq)||!stamp.equals(signatures.get(qq))){
                 CloudArchive.Result merged=CloudArchive.sync(source,qq,server,new JSONArray(),charts,false,p->{});
                 if(!names.equals(source.list(qq,false))||!stamp.equals(signature(qq,names)))throw new IOException("Source changed during indexing");
                 if(merged.merged.conflicts>0)throw new IOException("Conflicting history records require administrator review");
                 player=RankingData.player(qq,merged.merged.scores,charts);
+                JSONArray sixCharts=new JSONArray();for(int ci=0;ci<charts.length();ci++){JSONObject c=charts.getJSONObject(ci);if(c.optInt("keys")==6)sixCharts.put(c);}
+                RankingData.Player six=RankingData.player(qq,merged.merged.scores,sixCharts);
+                JSONArray recent=new JSONArray();long now=System.currentTimeMillis()/1000;
+                for(int ri=0;ri<merged.merged.scores.length();ri++){long at=merged.merged.scores.getJSONObject(ri).optLong("played_at");if(at>100000000000L)at/=1000;if(at>now-31L*86400&&at<=now+300)recent.put(at);}
+                extras.put(qq,new JSONObject().put("plays_total",merged.merged.scores.length()).put("recent_times",recent).put("six",RankingData.encode(six)));
+
                 JSONObject appearance=null;try{Path title=root.resolve(qq).resolve(PlayerTitle.FILE);if(Files.exists(title,LinkOption.NOFOLLOW_LINKS))appearance=new JSONObject(new String(read(title,4096),StandardCharsets.UTF_8));}catch(Exception invalidTitle){}
                 player.title=PlayerTitle.resolve(appearance,qq,server,merged.merged.scores,charts,player.rating);changed++;
             }
@@ -105,7 +112,7 @@ public final class RankingDaemon {
             long updated=System.currentTimeMillis();JSONArray all=new JSONArray(),totals=new JSONArray();Map<Integer,JSONArray> singles=new TreeMap<>();
             for(int i=0;i<charts.length();i++)singles.put(charts.getJSONObject(i).getInt("cid"),new JSONArray());
             for(RankingData.Player player:next.values()){
-                JSONObject encoded=RankingData.encode(player);all.put(encoded);
+                JSONObject encoded=RankingData.encode(player);JSONObject extra=extras.get(player.qq);JSONObject saved=new JSONObject(encoded.toString());if(extra!=null)saved.put("extra_boards",extra);all.put(saved);
                 // Remember empty archives privately, but do not rank them or re-read them every poll.
                 if(player.best.isEmpty())continue;
                 totals.put(new JSONObject(encoded.toString()).put("best",new JSONArray()));
@@ -114,6 +121,14 @@ public final class RankingDaemon {
                 }
             }
             for(Map.Entry<Integer,JSONArray> entry:singles.entrySet())atomic(output.resolve("charts/"+entry.getKey()+".json"),snapshot(server,revision,entry.getKey(),entry.getValue(),updated,failed,ids.size()));
+            JSONArray activity=new JSONArray(),sixTotals=new JSONArray();long cutoff=updated/1000-30L*86400;
+            for(RankingData.Player p:next.values()){JSONObject extra=extras.get(p.qq);if(extra==null)continue;
+                JSONArray times=extra.optJSONArray("recent_times");int month=0;if(times!=null)for(int i=0;i<times.length();i++)if(times.optLong(i)>=cutoff&&times.optLong(i)<=updated/1000)month++;
+                activity.put(new JSONObject().put("qq",p.qq).put("name",p.name).put("total",extra.optInt("plays_total")).put("month",month));
+                JSONObject six=extra.optJSONObject("six");if(six!=null&&(six.optInt("oc")+six.optInt("nc"))>0)sixTotals.put(new JSONObject(six.toString()).put("name",p.name).put("best",new JSONArray()));
+            }
+            atomic(output.resolve("activity.json"),snapshot(server,revision,0,activity,updated,failed,ids.size()));
+            atomic(output.resolve("6k.json"),snapshot(server,revision,0,sixTotals,updated,failed,ids.size()));
             // The total snapshot is the generation's final publication marker.
             atomic(output.resolve("rt.json"),snapshot(server,revision,0,totals,updated,failed,ids.size()));
             atomic(state.resolve(revision+".json"),new JSONObject().put("players",all));
