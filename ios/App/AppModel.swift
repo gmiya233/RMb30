@@ -179,7 +179,8 @@ import MalodyCore
         if upload && (state.avatar != nil || state.avatarDirty) {
             do {
                 var bytes: Data?
-                if let raw = state.avatar, let image = UIImage(data: raw) {
+                if let raw = state.avatar {
+                    guard let image = UIImage(data: raw) else { throw MalodyError.invalid("本机头像无法解码，请重新选择") }
                     let format = UIGraphicsImageRendererFormat(); format.scale = 1
                     let normalized = UIGraphicsImageRenderer(size: CGSize(width: 384, height: 384), format: format).image { _ in image.draw(in: CGRect(x: 0, y: 0, width: 384, height: 384)) }
                     bytes = normalized.jpegData(compressionQuality: 0.85)
