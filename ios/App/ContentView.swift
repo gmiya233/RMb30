@@ -55,42 +55,52 @@ struct HomePage: View {
     @State private var chooseFolder = false
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
-                Card {
-                    Text(model.showingPreview ? "RATING 模拟" : "PLAYER RATING").font(.caption.weight(.semibold)).foregroundStyle(Palette.accent)
-                    Text(model.previewBoard.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 50, weight: .bold, design: .rounded)).monospacedDigit().foregroundStyle(Palette.ink)
-                    HStack { metric("O20", model.board.old.count, 20); Spacer(); metric("N10", model.board.new.count, 10); Spacer(); VStack(alignment: .leading) { Text("成绩记录").font(.caption).foregroundStyle(.secondary); Text("\(model.state.records.count)").font(.title3.bold()) } }
-                    Divider()
-                    HStack { PlayerAvatar(data: model.state.avatar, side: 40); Text(model.playerName + " · " + model.playerTitle).font(.subheadline) }
-                }
-                MyActivityCard()
-                RatingPreviewControls()
-                Card {
-                    if model.busy { ProgressView().accessibilityLabel("正在处理") }
-                    Text(model.status).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled)
-                    if model.folderName.isEmpty { action("选择 Malody V 文件夹", "folder.badge.plus") { chooseFolder = true } }
-                    else { Label(model.folderName, systemImage: "folder").font(.footnote); action("同步本机成绩", "arrow.triangle.2.circlepath") { model.importScores() } }
-                    action("合并同步云端", "icloud.and.arrow.up") { model.syncCloud(upload: true) }
-                    if model.busy { Button("取消当前操作", role: .cancel) { model.cancel() }.frame(minHeight: 44) }
-                }
-                Card {
-                    HStack { Text("我的 B30").font(.title3.bold()); Spacer(); Button { model.selectedTab = 1 } label: { Image(systemName: "arrow.up.right") }.accessibilityLabel("查看 B30").frame(width: 44, height: 44) }
-                    HStack { Text("O20").foregroundStyle(Palette.accent); Text(model.board.oldRating, format: .number.precision(.fractionLength(4))).monospacedDigit(); Spacer(); Text("N10").foregroundStyle(.purple); Text(model.board.newRating, format: .number.precision(.fractionLength(4))).monospacedDigit() }
-                    HomePosterThumbnail()
-                }
+            VStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("最近游玩 · R50").font(.title2.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 12) {
+                        Button { model.selectedTab = 4 } label: { PlayerAvatar(data: model.state.avatar, side: 48).padding(3).background(Palette.selected, in: RoundedRectangle(cornerRadius: 14)) }.buttonStyle(.plain).accessibilityLabel("设置本地头像与昵称")
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(model.playerTitle).font(.caption).foregroundStyle(.white.opacity(0.9)).lineLimit(2)
+                            Text(model.playerName).font(.title3.bold()).foregroundStyle(.white).lineLimit(2)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.showingPreview ? "RATING 模拟" : "PLAYER RATING").font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.9))
+                        Text(model.previewBoard.rating, format: .number.precision(.fractionLength(4))).font(.system(size: 38, weight: .bold, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6).foregroundStyle(.white)
+                        Text("O20 \(model.board.old.count)/20  ·  N10 \(model.board.new.count)/10  ·  \(model.state.records.count) 条记录").font(.caption).foregroundStyle(.white.opacity(0.9))
+                    }
+                }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(Palette.accent, in: RoundedRectangle(cornerRadius: 20))
+                MyActivityCard()
+                VStack(alignment: .leading, spacing: 8) {
+                    if model.busy { ProgressView().accessibilityLabel("正在处理") }
+                    HStack(spacing: 10) {
+                        if model.folderName.isEmpty { action("选择文件夹", "folder.badge.plus") { chooseFolder = true } }
+                        else { action("本机同步", "arrow.triangle.2.circlepath") { model.importScores() } }
+                        action("云端同步", "icloud.and.arrow.up") { model.syncCloud(upload: true) }
+                    }
+                    DisclosureGroup { Text(model.status).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) } label: { Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                    if model.busy { Button("取消当前操作", role: .cancel) { model.cancel() }.frame(minHeight: 44) }
+                }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack { Text("我的 B30").font(.headline); Spacer(); Button { model.selectedTab = 1 } label: { Image(systemName: "arrow.up.right") }.accessibilityLabel("查看 B30").frame(width: 44, height: 44) }
+                    HStack { Text("O20").foregroundStyle(Palette.accent); Text(model.board.oldRating, format: .number.precision(.fractionLength(4))).monospacedDigit(); Spacer(); Text("N10").foregroundStyle(.purple); Text(model.board.newRating, format: .number.precision(.fractionLength(4))).monospacedDigit() }
+                        .font(.caption)
+                    HomePosterThumbnail()
+                }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
+                RatingPreviewControls()
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("最近游玩 · R50").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
                     if model.recent.isEmpty { Card { Label("还没有当前谱库的成绩", systemImage: "music.note").foregroundStyle(.secondary) } }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 240))], spacing: 12) { ForEach(model.recent) { score in NavigationLink(value: score.chart) { Card { ScoreRow(score: score) } }.buttonStyle(.plain) } }
                 }
-            }.padding(18).frame(maxWidth: 820)
+            }.padding(16).frame(maxWidth: 820)
                 .frame(maxWidth: .infinity)
         }
-        .navigationTitle("我的成绩")
+        .navigationTitle("我的节奏").navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $chooseFolder) { FolderPicker { url in chooseFolder = false; model.chooseFolder(url) } }
     }
     private func metric(_ label: String, _ count: Int, _ slots: Int) -> some View { VStack(alignment: .leading) { Text(label).font(.caption).foregroundStyle(.secondary); Text("\(count) / \(slots)").font(.title3.bold()).monospacedDigit() } }
-    private func action(_ title: String, _ icon: String, _ action: @escaping () -> Void) -> some View { Button(action: action) { Label(title, systemImage: icon).frame(maxWidth: .infinity, minHeight: 38) }.buttonStyle(.borderedProminent).disabled(model.busy || !model.ready) }
+    private func action(_ title: String, _ icon: String, _ action: @escaping () -> Void) -> some View { Button(action: action) { Label(title, systemImage: icon).font(.subheadline).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.bordered).disabled(model.busy || !model.ready) }
 }
 
 struct ArtView: View {

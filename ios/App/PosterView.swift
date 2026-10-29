@@ -152,7 +152,7 @@ struct HomePosterThumbnail: View {
     }
     var body: some View {
         Button { model.selectedTab = 1 } label: {
-            Group { if let image { Image(bitmap: image).resizable().scaledToFit().frame(maxHeight: 420) } else { ProgressView("生成成绩缩略图…").frame(height: 180) } }.frame(maxWidth: .infinity)
+            Group { if let image { Image(bitmap: image).resizable().scaledToFit().frame(maxHeight: 280) } else { ProgressView("生成成绩缩略图…").frame(height: 140) } }.frame(maxWidth: .infinity)
         }.buttonStyle(.plain).accessibilityLabel("查看完整 B30 成绩图")
         .task(id: signature) {
             for row in model.board.old + model.board.new { if Task.isCancelled { return }; _ = await model.art(row.chart) }

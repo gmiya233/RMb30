@@ -96,30 +96,29 @@ struct MyActivityCard: View {
     @State private var counts: [Int]?
     @State private var status = "正在读取云端…"
     var body: some View {
-        Card {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("我的活跃度", systemImage: "chart.bar.xaxis").font(.headline).foregroundStyle(Palette.ink)
+                Label("我的活跃度", systemImage: "chart.bar.xaxis").font(.subheadline.bold()).foregroundStyle(Palette.ink)
                 Spacer()
                 Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise").frame(width: 44, height: 44) }.accessibilityLabel("刷新我的活跃度")
             }
-            HStack(spacing: 22) {
+            HStack(alignment: .top, spacing: 6) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("今日游玩").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.accent)
-                    Text(counts.map { $0[0].formatted() } ?? "—").font(.system(size: 42, weight: .bold, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5)
+                    Text("今日").font(.caption).foregroundStyle(Palette.accent)
+                    Text(counts.map { $0[0].formatted() } ?? "—").font(.system(size: 26, weight: .bold, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5)
                     Text("次").font(.caption).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(Palette.selected, in: RoundedRectangle(cornerRadius: 20))
-                VStack(alignment: .leading, spacing: 16) {
-                    activityValue("近30天", index: 1)
-                    activityValue("累计游玩", index: 2)
-                }.frame(maxWidth: .infinity, alignment: .leading)
+                }.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(Palette.selected, in: RoundedRectangle(cornerRadius: 14))
+                activityValue("近30天", index: 1).padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                activityValue("累计", index: 2).padding(10).frame(maxWidth: .infinity, alignment: .leading)
             }
             Text(counts == nil ? status : "云端去重记录 · 今日按北京时间统计").font(.caption).foregroundStyle(.secondary)
-        }.task(id: model.qq + String(model.state.records.count)) { await load() }
+        }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18)).task(id: model.qq + String(model.state.records.count)) { await load() }
     }
     private func activityValue(_ label: String, index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(counts.map { $0[index].formatted() } ?? "—").font(.system(size: 25, weight: .semibold, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+            Text(counts.map { $0[index].formatted() } ?? "—").font(.system(size: 22, weight: .semibold, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5)
+            Text("次").font(.caption).foregroundStyle(.secondary)
         }
     }
     private func load() async {
