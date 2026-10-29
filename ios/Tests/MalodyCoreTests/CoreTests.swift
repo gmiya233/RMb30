@@ -56,7 +56,7 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(Rating.level(raw: 24, version: ""), 12); XCTAssertEqual(Rating.level(raw: 32, version: ""), 14)
         XCTAssertNil(Rating.level(raw: 36, version: "")); XCTAssertNil(Rating.level(raw: 16.5, version: ""))
         let c = try chart(), r = try record(c)
-        XCTAssertEqual(try XCTUnwrap(Rating.score(chart: c, record: r)), 10.134343639765182, accuracy: 1e-10)
+        XCTAssertEqual(try XCTUnwrap(Rating.score(chart: c, record: r)), 12.478183968738545, accuracy: 1e-10)
         let fresh = try chart(2, sid: 2, promoted: 1), old = try record(c), new = try record(fresh, accuracy: 99.8)
         let board = ScoreBoard(records: [old, new], catalogue: Catalogue(server: "", charts: [c, fresh]))
         XCTAssertEqual(board.old.count, 1); XCTAssertEqual(board.new.count, 1)
@@ -137,5 +137,34 @@ final class CoreTests: XCTestCase {
         XCTAssertThrowsError(try CommunityDocument(data: JSONSerialization.data(withJSONObject: doc), catalogue: catalogue, topic: "s2"))
         doc["average"] = 5
         XCTAssertThrowsError(try CommunityDocument(data: JSONSerialization.data(withJSONObject: doc), catalogue: catalogue, topic: "s1"))
+    }
+}
+
+extension CoreTests {
+    func testRatingV3ApprovedAnchorsAndMigration() throws {
+        let c = try chart(level: 14, version: "Lv.14")
+        let expected = [0.0, 13.58, 13.79, 14, 14.28, 14.56]
+        for judge in 1...5 {
+            let data = replay(hash: String(repeating: "a", count: 32), accuracy: 99.8, judge: UInt64(judge - 1))
+            let r = ScoreRecord(chart: c, replay: data, header: try ReplayHeader.read(data))
+            XCTAssertEqual(try XCTUnwrap(Rating.score(chart: c, record: r)), expected[judge], accuracy: 1e-10)
+        }
+        let a99 = 14 * (try XCTUnwrap(Rating.accuracyFactor(99))) * Rating.multipliers[1]
+        let e95 = 14 * (try XCTUnwrap(Rating.accuracyFactor(95))) * Rating.multipliers[5]
+        XCTAssertGreaterThan(a99, e95)
+        XCTAssertGreaterThan(e95, 14 * (try XCTUnwrap(Rating.accuracyFactor(96.5))))
+        XCTAssertLessThan(e95, 14 * (try XCTUnwrap(Rating.accuracyFactor(97))))
+        XCTAssertEqual(try XCTUnwrap(Rating.accuracyFactor(99.5)), 1 / 1.01, accuracy: 1e-12)
+        XCTAssertEqual(try XCTUnwrap(Rating.accuracyFactor(99.8)), 1)
+        XCTAssertEqual(try XCTUnwrap(Rating.accuracyFactor(100)), 1)
+        var prior = -1.0
+        for value in 0...10000 {
+            let factor = try XCTUnwrap(Rating.accuracyFactor(Double(value) / 100))
+            XCTAssertGreaterThanOrEqual(factor, prior); prior = factor
+        }
+        var saved = RatingPreview(); saved.multipliers = [0, 0.78, 0.85, 1, 1.1, 1.2]
+        XCTAssertEqual(saved.migratedRules().multipliers, Rating.multipliers)
+        saved.multipliers[1] = 0.91
+        XCTAssertEqual(saved.migratedRules().multipliers[1], 0.91)
     }
 }

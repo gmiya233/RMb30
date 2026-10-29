@@ -130,7 +130,7 @@ struct RatingPreviewControls: View {
                 }.frame(minHeight: 44)
                 if !notice.isEmpty { Text(notice).font(.caption).foregroundStyle(Palette.accent) }
                 Button("恢复默认") { model.preview = RatingPreview(); model.showingPreview = false }.frame(minHeight: 44)
-                Text("rating = 折算等级 × 准度系数 × 判定倍率。99.8%以上系数为1.01；99.5%以下为(准度/99.5)²。全图判定优先于单曲判定。模拟不改变真实成绩、称号和上传数据。").font(.caption).foregroundStyle(.secondary)
+                Text("rating = 折算等级 × 准度系数 × 判定倍率。99.8%以上系数为1；99.5%以下为(准度/99.5)²÷1.01，中间段为[1+(准度−99.5)/30]÷1.01。A～E倍率为0.97/0.985/1/1.02/1.04。全图判定优先于单曲判定。模拟不改变真实成绩、称号和上传数据。").font(.caption).foregroundStyle(.secondary)
             }.padding(.vertical, 10)
         }.padding(16).background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18))
         .onChange(of: cid) { value in

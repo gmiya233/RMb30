@@ -2,55 +2,61 @@
   {
     "catalogue": {
       "server": "https://fixture.invalid",
-      "charts": [{
-        "mode": 7,
-        "promote": 1,
-        "path": "promote/_song_2/0",
-        "mc_name": "1.mc",
-        "level": 13,
-        "server_hash": "hash",
-        "title": "Fixture",
-        "version": "SC10 LV.13",
-        "cid": 1,
-        "sid": 2
-      }]
+      "charts": [
+        {
+          "mode": 7,
+          "promote": 1,
+          "path": "promote/_song_2/0",
+          "mc_name": "1.mc",
+          "level": 13,
+          "server_hash": "hash",
+          "title": "Fixture",
+          "version": "SC10 LV.13",
+          "cid": 1,
+          "sid": 2
+        }
+      ]
     },
-    "revision": "2cc989fff109f42de266ae434460c48eb9af3642f015276064f3c5aed33fc9b6"
+    "revision": "3fd7c51ee5145fd658605fcafcb51f29c0729b6097c191aff0b48e1763ecf0a0"
   },
   {
     "catalogue": {
       "server": "https://fixture.invalid",
-      "charts": [{
-        "mode": 7,
-        "promote": false,
-        "path": "charts/鏇茬粯/馃挮",
-        "mc_name": "1.mc",
-        "level": 12.5,
-        "server_hash": "hash",
-        "title": "Fixture",
-        "version": "LV.12.5",
-        "cid": 1,
-        "sid": 2
-      }]
+      "charts": [
+        {
+          "mode": 7,
+          "promote": false,
+          "path": "charts/鏇茬粯/馃挮",
+          "mc_name": "1.mc",
+          "level": 12.5,
+          "server_hash": "hash",
+          "title": "Fixture",
+          "version": "LV.12.5",
+          "cid": 1,
+          "sid": 2
+        }
+      ]
     },
-    "revision": "8031a0702a660a244e5ca364abb09848a6947e74d1ac5cd81618e8b2fead37ca"
+    "revision": "52578ac5f81eed059285162bb7aac46e98db2b486e331d53b2aaf09e6b8b1ed4"
   },
   {
     "catalogue": {
       "server": "https://fixture.invalid",
-      "charts": [{
-        "mode": 7,
-        "promote": true,
-        "path": "charts/slash\"quote",
-        "mc_name": "1.mc",
-        "level": null,
-        "server_hash": "hash",
-        "title": "Fixture",
-        "version": "SC9.5",
-        "cid": 1,
-        "sid": 2
-      }]
+      "charts": [
+        {
+          "mode": 7,
+          "promote": true,
+          "path": "charts/slash\"quote",
+          "mc_name": "1.mc",
+          "level": null,
+          "server_hash": "hash",
+          "title": "Fixture",
+          "version": "SC9.5",
+          "cid": 1,
+          "sid": 2
+        }
+      ]
     },
-    "revision": "b57c578a0aaa10e9eaeba28c7151043ae7f69d7bd4d855bf9366c6ede01ccd34"
+    "revision": "ec1347cbe74bcdf69149c84a8a941878ea5b91fae683d52f328b2535b5810e46"
   }
 ]

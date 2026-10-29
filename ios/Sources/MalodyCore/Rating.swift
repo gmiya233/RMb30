@@ -1,6 +1,8 @@
 import Foundation
 
 public enum Rating {
+    public static let revision = "rating-v3-c998-normalized"
+    public static let multipliers: [Double] = [0, 0.97, 0.985, 1, 1.02, 1.04]
     public static func formatLevel(_ value: Double) -> String {
         if value == value.rounded(), abs(value) < 1e12 { return String(format: "%.0f", locale: Locale(identifier: "en_US_POSIX"), value) }
         return String(value)
@@ -28,12 +30,12 @@ public enum Rating {
     }
     public static func accuracyFactor(_ n: Double) -> Double? {
         guard n.isFinite, (0...100).contains(n) else { return nil }
-        if n >= 99.8 { return 1.01 }; if n >= 99.5 { return 1 + (n - 99.5) / 30 }
-        return pow(n / 99.5, 2)
+        if n >= 99.8 { return 1 }; if n >= 99.5 { return (1 + (n - 99.5) / 30) / 1.01 }
+        return pow(n / 99.5, 2) / 1.01
     }
     public static func score(chart: Chart, record: ScoreRecord) -> Double? {
         guard let level = chart.level, let factor = accuracyFactor(record.accuracy), (1...5).contains(record.judge) else { return nil }
-        return level * factor * [0, 0.78, 0.85, 1, 1.10, 1.20][record.judge]
+        return level * factor * multipliers[record.judge]
     }
     public static func judgeName(_ judge: Int) -> String { (1...5).contains(judge) ? "\(Array("ABCDE")[judge - 1])判" : "判定待核对" }
 }

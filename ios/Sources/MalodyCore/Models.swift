@@ -61,7 +61,7 @@ public struct Catalogue: Codable {
     public var byCID: [Int: Chart] { Dictionary(charts.map { ($0.cid, $0) }, uniquingKeysWith: { first, _ in first }) }
     public var promotedSongs: Set<String> { Set(charts.filter { $0.promoted || $0.path.hasPrefix("promote/") }.map(\.identity)) }
     public func revision() -> String {
-        var key = "index-v2-zero-based-judge:"
+        var key = "index-v3-c998-normalized:"
         func part(_ value: String) { key += "\(value.utf16.count):\(value)" }
         part(server)
         for c in charts.sorted(by: { $0.cid < $1.cid }) {

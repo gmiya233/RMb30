@@ -10,7 +10,7 @@ public final class RankingDaemonTest {
         Path temp=Files.createTempDirectory(Paths.get("build"),"ranking-fixture-");Path root=Files.createDirectory(temp.resolve("archives")),state=temp.resolve("state"),cat=temp.resolve("catalog.json");
         String server=RankingIndexTest.SERVER,qq=RankingIndexTest.QQ;JSONArray charts=new JSONArray().put(RankingTest.chart(1,1,12,false).put("keys",6)).put(RankingTest.chart(2,2,13,true).put("keys",4));
         Files.writeString(cat,new JSONObject().put("server",server).put("charts",charts).toString());
-        JSONArray scores=new JSONArray().put(RankingTest.score(1,1,99.5,3,100));byte[] raw=CloudRecords.pack(qq,server,scores);Path folder=Files.createDirectory(root.resolve(qq));Path archive=folder.resolve("scores-"+CloudRecords.sha256(raw)+".json");Files.write(archive,raw);
+        JSONArray scores=new JSONArray().put(RankingTest.score(1,1,99.8,3,100));byte[] raw=CloudRecords.pack(qq,server,scores);Path folder=Files.createDirectory(root.resolve(qq));Path archive=folder.resolve("scores-"+CloudRecords.sha256(raw)+".json");Files.write(archive,raw);
         String revision=RankingIndex.revision(server,charts);RankingIndexTest.Remote indices=new RankingIndexTest.Remote();
         RankingIndex.publish(indices,server,revision,0,qq,scores,charts,"Fixture",2);RankingIndex.publish(indices,server,revision,1,qq,scores,charts,"Fixture",2);
         for(Map.Entry<String,TreeMap<String,byte[]>> dir:indices.folders.entrySet())for(Map.Entry<String,byte[]> f:dir.getValue().entrySet()){Path out=root.resolve(dir.getKey().substring(1)).resolve(f.getKey());Files.createDirectories(out.getParent());Files.write(out,f.getValue());}

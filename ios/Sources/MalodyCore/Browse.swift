@@ -43,12 +43,17 @@ public enum SongBrowse {
 }
 
 public struct RatingPreview: Codable {
-    public var multipliers: [Double] = [0, 0.78, 0.85, 1, 1.1, 1.2]
+    public var multipliers: [Double] = Rating.multipliers
     public var judge = 0
     public var levels: [Int: Double] = [:]
     public var accuracies: [Int: Double] = [:]
     public var judges: [Int: Int] = [:]
     public init() {}
+    public func migratedRules() -> RatingPreview {
+        var result = self
+        if result.multipliers == [0, 0.78, 0.85, 1, 1.1, 1.2] { result.multipliers = Rating.multipliers }
+        return result
+    }
     public func value(chart: Chart, record: ScoreRecord) -> Double? {
         let j = judge == 0 ? (judges[chart.cid] ?? record.judge) : judge
         guard multipliers.count == 6, (1...5).contains(j), multipliers[j].isFinite, multipliers[j] > 0, multipliers[j] <= 10,

@@ -19,10 +19,10 @@ public final class RankingIndexTest {
     }
     public static void main(String[] args)throws Exception {
         JSONArray charts=new JSONArray().put(RankingTest.chart(1,1,12,false)).put(RankingTest.chart(2,2,13,true));String revision=RankingIndex.revision(SERVER,charts),path=RankingIndex.folder(revision,0,QQ);
-        JSONArray a=new JSONArray().put(RankingTest.score(1,1,99.5,3,100)),b=new JSONArray().put(RankingTest.score(2,2,99.8,3,200));Remote r=new Remote();
+        JSONArray a=new JSONArray().put(RankingTest.score(1,1,99.8,3,100)),b=new JSONArray().put(RankingTest.score(2,2,99.8,3,200));Remote r=new Remote();
         RankingIndex.publish(r,SERVER,revision,0,QQ,a,charts,"Fixture",2);check(r.files(path).size()==1,"first index");int before=r.writes;RankingIndex.publish(r,SERVER,revision,0,QQ,a,charts,"Fixture",2);check(r.writes==before,"idempotent publication");
         r.afterWrite=()->{try{r.seed(path,RankingIndex.document(SERVER,revision,0,QQ,a,"Fixture",2));}catch(Exception e){throw new RuntimeException(e);}};
-        RankingIndex.publish(r,SERVER,revision,0,QQ,b,charts,"Fixture",3);check(near(RankingIndex.player(QQ,RankingIndex.read(r,SERVER,revision,0,QQ,charts),charts).rating,(12+13*1.01)/30),"upload unions previous summary");
+        RankingIndex.publish(r,SERVER,revision,0,QQ,b,charts,"Fixture",3);check(near(RankingIndex.player(QQ,RankingIndex.read(r,SERVER,revision,0,QQ,charts),charts).rating,25.0/30),"upload unions previous summary");
         Remote racing=new Remote();racing.afterWrite=()->{try{racing.seed(path,RankingIndex.document(SERVER,revision,0,QQ,b,"Fixture",3));}catch(Exception e){throw new RuntimeException(e);}};RankingIndex.publish(racing,SERVER,revision,0,QQ,a,charts,"Fixture",2);check(racing.files(path).size()==2&&RankingIndex.read(racing,SERVER,revision,0,QQ,charts).scores.length()==2,"publication never deletes concurrent unseen head");
         Remote concurrent=new Remote();concurrent.seed(path,RankingIndex.document(SERVER,revision,0,QQ,a,"Fixture",2));concurrent.seed(path,RankingIndex.document(SERVER,revision,0,QQ,b,"Fixture",3));check(RankingIndex.read(concurrent,SERVER,revision,0,QQ,charts).scores.length()==2,"concurrent unseen heads both survive");
         RankingIndex.publish(concurrent,SERVER,revision,0,QQ,a,charts,"Fixture",2);check(concurrent.files(path).size()==1&&concurrent.removes==2,"subsequent publish compacts only incorporated heads");

@@ -78,8 +78,8 @@ public final class ScorePoster {
         for(int i=0;i<12;i++){float x=(i*193)%1500,y=340+(i*233)%1050;c.save();c.rotate(18,x,y);rect(x,y,62,62,0x28ffffff,6);c.restore();}
         header(board);section("O20","日常歌曲 · rating 前 20",board.old,20,307,CYAN);
         section("N10","promote 新歌 · rating 前 10",board.fresh,10,1111,PINK);
-        text("rating = 折算等级 × 准度系数 × 判定倍率   |   99.5% → 100%   ·   99.8%+ → 101%",49,1570,20,NAVY,false);
-        text("低于99.5%取 (准度/99.5)²；99.5%～99.8%线性增长；其后封顶。缺位按0计入30曲均值。",49,1602,18,0xff38536a,false);
+        text("rating = 折算等级 × 准度系数 × 判定倍率   |   99.5% → 99.0099%   ·   99.8%+ → 100%",49,1570,20,NAVY,false);
+        text("ACC原曲线统一除以1.01；99.8%以上封顶为1。缺位按0计入30曲均值。",49,1602,18,0xff38536a,false);
         text("SC1–4→12，SC5–13→13，SC14+→15；其他等级按MaV→RM表 · * 手动预览 · 非官方 MM",49,1633,18,0xff38536a,false);
         if(board.demo){c.save();c.rotate(-16,WIDTH/2f,HEIGHT/2f);text("示例数据 / SAMPLE",220,HEIGHT/2f,92,0x22a62c8d,true);c.restore();}
         for(Bitmap b:jackets.values())if(b!=null)b.recycle();jackets.clear();return bitmap;

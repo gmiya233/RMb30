@@ -22,7 +22,7 @@ import MalodyCore
     @Published var rankingLoading = false
     @Published var communityBoards: CommunityDocument?
     @Published var communityStatus = ""
-    @Published var preview: RatingPreview = UserDefaults.standard.data(forKey: "rating-preview").flatMap { try? JSONCoding.decode(RatingPreview.self, $0) } ?? RatingPreview() {
+    @Published var preview: RatingPreview = UserDefaults.standard.data(forKey: "rating-preview").flatMap { try? JSONCoding.decode(RatingPreview.self, $0).migratedRules() } ?? RatingPreview() {
         didSet { if let data = try? JSONCoding.encode(preview) { UserDefaults.standard.set(data, forKey: "rating-preview") } }
     }
     @Published var showingPreview = false

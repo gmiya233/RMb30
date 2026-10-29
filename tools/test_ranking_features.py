@@ -12,7 +12,7 @@ def main():
     names = ['ChartPreviewData', 'ChartMatcher', 'ChartDetails', 'RatingRules', 'RatingBoard',
              'SongCatalogue', 'CloudRecords', 'CloudArchive', 'RankingData',
              'RankingIndex', 'RankingSnapshot', 'RecentPlays', 'ChartKeys', 'CommunityData', 'UpdateData', 'ScanCache', 'ReplayScanCache', 'PlayerTitle', 'ChartPackage', 'QqDownloadPolicy']
-    tests = ['ChartPreviewDataTest', 'RankingTest', 'RankingIndexTest', 'CloudArchiveTest',
+    tests = ['RatingRulesTest', 'ChartPreviewDataTest', 'RankingTest', 'RankingIndexTest', 'CloudArchiveTest',
              'RecentSearchTest', 'RankingDaemonTest', 'ChartKeysTest', 'CommunityDataTest', 'UpdateDataTest', 'ScanCacheTest', 'ChartPackageTest', 'QqDownloadPolicyTest']
     sources = [ROOT / f'android/src/cn/gmiya/malodylink/{n}.java' for n in names]
     sources += [ROOT / 'server/RankingDaemon.java']

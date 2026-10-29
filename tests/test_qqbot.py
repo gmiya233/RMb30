@@ -112,8 +112,8 @@ class BotTests(unittest.TestCase):
         for command in ('rating', '<@!123> /rating', 'RATING', 'Rating', 'rating规则'):
             reply = query.execute(command)
             self.assertEqual(reply, Queries.RATING_HELP)
-        for part in ('0.78', '0.85', '1.10', '1.20', '(P ÷ 99.5)²',
-                     '(P − 99.5) ÷ 30', '1.01', '13.1300', '÷ 30',
+        for part in ('0.97', '0.985', '1.02', '1.04', '(P ÷ 99.5)²',
+                     '(P − 99.5) ÷ 30', '1.01', '13.0000', '÷ 30',
                      '空位按0算', '只取最高的一条', 'promote', 'SC1–4→12', '模拟设置不改变云端排行'):
             self.assertIn(part, reply)
         self.assertLess(len(reply), 1800)
