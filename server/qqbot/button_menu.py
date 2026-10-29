@@ -1,7 +1,7 @@
 """Public command menu, sent only in response to a group mention."""
 COMMANDS = {'', '菜单', '帮助', 'help'}
 ROWS = (
-    (('我的 B30', 'b30', True), ('总战力榜', '总榜', True), ('rating 规则', 'rating', True)),
+    (('我的 B30', 'b30', True), ('总战力榜', '总榜', True), ('6K B30', '6kb30', True), ('rating 规则', 'rating', True)),
     (('查找歌曲', '查歌 ', False), ('单曲排行', '单曲榜 ', False), ('谱面预览', '谱面预览 ', False)),
     (('绑定 QQ', '绑定 ', False), ('我的绑定', '我的绑定', True), ('玩家排名', '查排名 ', False)),
     (('累计活跃榜', '活跃榜 累计', True), ('月活跃榜', '活跃榜 月', True), ('6K 排行', '6K榜', True)),

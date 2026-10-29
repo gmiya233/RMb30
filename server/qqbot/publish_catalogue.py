@@ -65,6 +65,14 @@ def publish_b30(catalogue, target):
             continue
         doc = prepare(player, catalogue, revision, totals['updated'])
         atomic(target / 'b30' / revision / (qq + '.json'), json.dumps(doc, ensure_ascii=False, separators=(',', ':')).encode())
+        six=player.get('extra_boards',{}).get('six')
+        if six and six.get('best'):
+            six=dict(six,name=player['name'],title=player.get('title',''))
+            six_catalogue=dict(catalogue,charts=[c for c in catalogue['charts'] if c.get('keys')==6])
+            six_doc=prepare(six,six_catalogue,revision,totals['updated'])
+            six_doc['keys']=6
+            atomic(target/'b30'/revision/(qq+'-6k.json'),json.dumps(six_doc,ensure_ascii=False,separators=(',',':')).encode())
+
 
 
 def main():

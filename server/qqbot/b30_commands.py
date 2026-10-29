@@ -14,7 +14,7 @@ def command_parts(content):
 
 
 class B30Commands:
-    COMMANDS = {'b30', '绑定', '绑定qq', '解绑', '我的绑定'}
+    COMMANDS = {'b30', '6kb30', '6k', '6k成绩图', '绑定', '绑定qq', '解绑', '我的绑定'}
 
     def __init__(self, queries, bindings, summaries, font, artwork):
         self.queries = queries
@@ -25,6 +25,10 @@ class B30Commands:
         command, arg = command_parts(content)
         if command not in self.COMMANDS:
             return None
+        six=command in ('6kb30','6k成绩图') or (command=='6k' and arg.casefold()=='b30')
+        if command=='6k':
+            if not six: return '用法：6K B30'
+            arg=''
         if len(arg) > 100:
             return '参数过长，请发送“帮助”查看用法。'
         if command in ('绑定', '绑定qq'):
@@ -44,15 +48,15 @@ class B30Commands:
         if arg:
             return '直接发送 b30 即可查询已绑定的QQ；更换请发送“绑定 新QQ号”。'
         try:
-            players, _ = self.queries.board()
+            players, _ = self.queries.board(six=True) if six else self.queries.board()
             player = next((p for p in players if p['qq'] == qq), None)
             if not player:
-                return '这个QQ暂无云端成绩，请先在App中同步云端，再发送 b30。'
+                return '这个QQ暂无有效6K成绩，请先在App中同步云端。' if six else '这个QQ暂无云端成绩，请先在App中同步云端，再发送 b30。'
             status = read_json(self.queries.root / 'status.json', 100000)
             revision = status['revision']
             if not re.fullmatch('[a-f0-9]{64}', revision):
                 raise Unavailable('invalid revision')
-            path = self.summaries / revision / (qq + '.json')
+            path = self.summaries / revision / (qq + ('-6k.json' if six else '.json'))
             if not path.exists():
                 return 'B30云端摘要正在更新，请稍后再试。'
             doc = read_json(path, 300000)
@@ -61,6 +65,7 @@ class B30Commands:
             for key in ('rating', 'o', 'n'):
                 if abs(number(doc.get(key), upper=100) - player[key]) > 1e-10:
                     return '新成绩已收到，B30云端摘要正在更新，请稍后再试。'
+            if six and doc.get('keys')!=6: raise Unavailable('wrong lane summary')
             seen = set()
             for key, maximum in [('old', 20), ('new', 10)]:
                 rows = doc[key]

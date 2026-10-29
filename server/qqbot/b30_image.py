@@ -53,7 +53,7 @@ def render(doc, font_path, artwork_root=None):
     label(1102, 52, '节奏大师', 65, TEAL)
     label(1110, 127, 'RHYTHM MASTER', 23, TEAL)
     rounded((1070, 166, 1560, 245), '#ffffff')
-    label(1103, 181, f"RATING   {doc['rating']:.4f}", 35, PURPLE)
+    label(1103, 181, f"{'6K ' if doc.get('keys')==6 else ''}RATING   {doc['rating']:.4f}", 35, PURPLE)
 
     def card(row, index, x, y, color):
         rounded((x, y, x + 292, y + 186), '#ffffff', 12)
@@ -121,7 +121,7 @@ def render(doc, font_path, artwork_root=None):
     section('O20', '日常歌曲 · rating 前20', doc['old'], 20, doc['o'], 270, TEAL)
     section('N10', 'promote 新歌 · rating 前10', doc['new'], 10, doc['n'], 1150, PURPLE)
     stamp = datetime.fromtimestamp(doc['updated'] / 1000, ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M')
-    label(42, 1674, 'O20 + N10 · 按歌曲收录最佳成绩 · 缺位按0计', 23, MUTED)
+    label(42, 1674, ('6K B30 · ' if doc.get('keys')==6 else '') + 'O20 + N10 · 按歌曲收录最佳成绩 · 缺位按0计', 23, MUTED)
     label(42, 1713, '云端成绩 · ' + stamp, 21, MUTED)
     label(1350, 1710, 'Malody Link', 23, TEAL)
     output = BytesIO()
