@@ -1,6 +1,7 @@
 .server-inspection/
 device-inspection/
 tools/python-libs/
+assets/fonts/radar-preview/
 __pycache__/
 .cache/
 .venv/
