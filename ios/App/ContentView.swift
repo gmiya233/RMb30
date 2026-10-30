@@ -78,7 +78,7 @@ struct HomePage: View {
                     if model.busy { ProgressView().accessibilityLabel("正在处理") }
                     HStack(spacing: 10) {
                         if model.folderName.isEmpty { action("选择文件夹", "folder.badge.plus") { chooseFolder = true }.accessibilityIdentifier("home.chooseMalodyFolder") }
-                        else { action("本机同步", "arrow.triangle.2.circlepath") { model.importScores() } }
+                        else { action("本机同步", "arrow.triangle.2.circlepath") { model.importScores() }.accessibilityIdentifier("home.syncLocalScores") }
                         action("云端同步", "icloud.and.arrow.up") { model.syncCloud(upload: true) }
                     }
                     DisclosureGroup { Text(model.status).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) } label: { Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(2) }

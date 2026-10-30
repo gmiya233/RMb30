@@ -9,7 +9,7 @@ final class AppUITests: XCTestCase {
         app.launch()
     }
     func testLocalFolderImportAndRepeat() throws {
-        let sync = app.buttons["同步本机成绩"]
+        let sync = app.buttons["home.syncLocalScores"]
         XCTAssertTrue(sync.waitForExistence(timeout: 15))
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: sync)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed)
