@@ -24,7 +24,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 FONT = FontProperties(fname='C:/Windows/Fonts/msyh.ttc')
 plt.rcParams.update({'font.family': FONT.get_name(), 'axes.unicode_minus': False,
                      'svg.fonttype': 'path', 'pdf.fonttype': 42})
-LABELS = ['物量', '同押', '爆发', '变速', '长按复合', '滑键']
+LABELS = ['物量', '多押', '爆发', '变速', '长条', '滑键']
 AXES = ['notes', 'chord', 'peak', 'speed', 'hold', 'slide']
 CATEGORY_AXES = ['notes', 'chord', 'peak', 'hold', 'slide', 'speed']
 COLORS = ['#097e88', '#a26710', '#c05158', '#9a48a2', '#6b63b7', '#2476b1']
@@ -54,7 +54,7 @@ def raw(row, axis):
     value = row[axis]
     if value is None:
         return '暂不统计'
-    if axis in ('notes', 'chord', 'hold'):
+    if axis in ('notes', 'chord'):
         return f'{value:,}'
     return f'{value:.2f}'
 
@@ -84,7 +84,7 @@ def radar(ax, row, highlight, title=True, compact=False):
 
 
 def detail(row, label, axis, rank):
-    unit={'notes':'个','chord':'组','peak':'notes/s','hold':'条','slide':'点/s','speed':'次/min'}[axis]
+    unit={'notes':'个','chord':'组','peak':'点/s','hold':'平均条','slide':'点/s','speed':'次/min'}[axis]
     return f"#{rank}  {raw(row,axis)} {unit}  ·  Lv.{row['normalized_level']:g} · {row['keys']}K\nCID {row['cid']} · {row['source_format']}"
 
 
@@ -94,7 +94,7 @@ def single(row, axis, path):
     fig.text(.07,.865,f"Lv.{row['normalized_level']:g}  ·  {row['keys']}K  ·  CID {row['cid']}  ·  {row['source_format']}",fontsize=11,color=MUTED)
     ax=fig.add_axes([.17,.29,.66,.52],projection='polar')
     radar(ax,row,axis,title=False)
-    units=['个','组','notes/s','次/min','条','点/s']
+    units=['个','组','点/s','次/min','平均条','点/s']
     for i, key in enumerate(AXES):
         x=.09+(i%3)*.30; y=.19-(i//3)*.065
         fig.text(x,y,LABELS[i],fontsize=10,color=MUTED)
@@ -118,7 +118,7 @@ def category(doc, axis, keys=None):
         ax=fig.add_axes([.035+i*.195,.24,.145,.46],projection='polar')
         radar(ax,row,axis,compact=True)
         fig.text(.107+i*.195,.13,detail(row,label,axis,i+1),ha='center',va='top',fontsize=11,color=COLORS[index],fontproperties=FONT)
-    fig.text(.025,.035,'爆发：连续4秒峰值；同押：三押＋四押；滑键：转角＋箭头终点／秒；IMD变速暂不统计，按0显示，不参与变速排名。',fontsize=11,color=MUTED,fontproperties=FONT)
+    fig.text(.025,.035,'爆发：连续4秒峰值；多押：三押＋四押；滑键：转角＋箭头终点／秒；IMD变速暂不统计，按0显示，不参与变速排名。',fontsize=11,color=MUTED,fontproperties=FONT)
     return fig
 
 
@@ -152,15 +152,15 @@ def html_report(doc, output):
             scales={key:(f'{value:.1f}' if value is not None else '—') for key,value in row['radar'].items()}
             cells=''.join(f'<tr><th>{LABELS[i]}</th><td>{raw(row,key)}</td><td>{scales[key]}</td></tr>' for i,key in enumerate(AXES))
             speed_text='IMD变速暂不统计，按0显示，不参与该轴排名' if row.get('speed_status')=='disabled_imd_zero' else f'速度变化 {row["speed_events"]}次'
-            cards.append(f'<article><h3>#{rank} {title}</h3><p>Lv.{row["normalized_level"]:g} · {row["keys"]}K · CID {cid} · {row["source_format"]}</p><img alt="{title} 六维图" loading="lazy" src="data:image/png;base64,{image}"><details><summary>原始数据与刻度</summary><table><tr><th>维度</th><th>原始值</th><th>雷达刻度</th></tr>{cells}</table><p>三押 {row["chord3"]}组／四押 {row["chord4"]}组；直长条 {row["hold"]}条；滑键 {row["slide_points"]}点。<br>峰值窗口：第 {row["peak_start_s"]:.2f}–{row["peak_end_s"]:.2f}秒，{row["peak_count"]}个音符；计时从首个音符开始。<br>有效时长 {row["duration_s"]:.2f}秒；{speed_text}。</p></details></article>')
+            cards.append(f'<article><h3>#{rank} {title}</h3><p>Lv.{row["normalized_level"]:g} · {row["keys"]}K · CID {cid} · {row["source_format"]}</p><img alt="{title} 六维图" loading="lazy" src="data:image/png;base64,{image}"><details><summary>原始数据与刻度</summary><table><tr><th>维度</th><th>原始值</th><th>雷达刻度</th></tr>{cells}</table><p>三押 {row["chord3"]}组／四押 {row["chord4"]}组；长条峰值 {row["hold"]:.3f}平均条；滑键 {row["slide_points"]}点。<br>峰值窗口：第 {row["peak_start_s"]:.2f}–{row["peak_end_s"]:.2f}秒，{row["peak_count"]}个音符；计时从首个音符开始。<br>有效时长 {row["duration_s"]:.2f}秒；{speed_text}。</p></details></article>')
         body.append(f'<section id="{axis}"><h2>{label} TOP 5</h2><div class="grid">'+''.join(cards)+'</div></section>')
     anchors=''.join('<tr><th>'+k+'K</th>'+''.join(f'<td>{v[a]:.3f}</td>' for a in AXES)+'</tr>' for k,v in doc['anchors'].items())
     methods='''<ul>
 <li>范围：当前可查的服务器谱面；按现有 SC／MaV→RM 规则换算后取10～15级。313张：4K 272张、5K 6张、6K 35张。44张隐藏谱面未纳入，68张等级范围外，解析失败0张。</li>
 <li>物量＝可玩音符头总数。一个长条或整条滑键起点记1；声音事件不计，长条尾与折点不重复计物量。本口径不等同于游戏最大combo。</li>
-<li>同押＝三押组数＋四押组数，同一时刻四押不拆成三押。以同时开始的音符头计组，不把正在按住的长条另算一次按下。五押、六押单独记录，暂不计本轴。</li>
-<li>爆发＝真实连续4秒半开窗口内最多音符头数÷4，多押的每个音符分别计数；BPM变化按分段节拍积分换算真实时间。</li>
-<li>长按复合＝没有横向位移和滑出方向的直长条数量，整条计1，不按内部段数累加。</li>
+<li>多押＝三押组数＋四押组数，同一时刻四押不拆成三押。以同时开始的音符头计组，不把正在按住的长条另算一次按下。五押、六押单独记录，暂不计本轴。</li>
+<li>爆发＝真实连续4秒半开窗口内最多（音符头＋滑键折点）÷4，单滑键计2折点，转角和末端按实际时刻计入；BPM变化按分段节拍积分换算真实时间。</li>
+<li>长条＝最密连续8秒内平均同时按住的直长条数，按真实占用时长积分÷8；横向滑键不算直长条，原始总条数仅作核对。</li>
 <li>滑键＝中途转角＋末端箭头落点，起点和共线冗余控制点不计，单次直滑计1。用户示意图三个例子为2／1／4。密度＝点数÷首个音符至最后音符结束的秒数。</li>
 <li>变速＝有效BPM、HS、scroll变化的合并事件数÷有效分钟数；同一拍只算一次，初始设置、重复相同值忽略。不把jump位置跳变、sign拍号标记当成速度变化。细小数值改变也会被计数，因此这是控制点频率，不是直接的操作难度。</li>
 <li>IMD原始谱面优先于占位MC：匹配MC同名IMD，其次精确歌曲名；不任意选同文件夹其他难度。不执行皮肤或谱面脚本。按用户要求，IMD变速暂不统计：原始值和雷达值统一按0显示，雷达图正常闭合；不参与变速前五及变速锚点计算，其余五项保持原算法。</li>

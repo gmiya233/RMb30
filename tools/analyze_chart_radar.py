@@ -4,6 +4,7 @@ Input is a chart-only ZIP snapshot: catalog.json plus snapshot_mc/snapshot_imd
 members referenced by its chart rows. Outputs contain derived statistics only.
 """
 import argparse
+from bisect import bisect_right
 from collections import Counter, defaultdict
 import csv
 import hashlib
@@ -20,10 +21,10 @@ from render import Timeline, beat, parse
 from imd import parse_imd
 from b30_data import level
 
-VERSION = 'study-3-heads-4s-user-corners-imd-speed-zero'
+VERSION = 'study-6-peak-eight-second-hold-occupancy'
 AXES = [
-    ('notes', '物量', '个'), ('chord', '同押', '组'),
-    ('peak', '爆发', 'notes/s'), ('hold', '长按复合', '条'),
+    ('notes', '物量', '个'), ('chord', '多押', '组'),
+    ('peak', '爆发', '点/s'), ('hold', '长条', '平均条'),
     ('slide', '滑键', '点/s'), ('speed', '变速', '次/min'),
 ]
 
@@ -32,10 +33,10 @@ def sign(value):
     return 0 if abs(value) < 1e-7 else 1 if value > 0 else -1
 
 
-def slide_points(note):
+def slide_point_beats(note):
     """Orthogonal projection used by RM preview; turns plus arrow endpoint.
 
-    Example shapes confirmed by the user: up/right=2, right=1,
+    Example shapes confirmed by the user: up/right=2, standalone right=2,
     up/right/up/left=4. Redundant collinear control points are ignored.
     """
     points = list(note.points) or [(note.start, note.x)]
@@ -43,24 +44,32 @@ def slide_points(note):
     lateral = False
     for (t1, x1), (t2, x2) in zip(points, points[1:]):
         if sign(t2 - t1):
-            directions.append(('v', sign(t2 - t1)))
+            directions.append((('v', sign(t2 - t1)), t1))
         if sign(x2 - x1):
-            directions.append(('h', sign(x2 - x1)))
+            directions.append((('h', sign(x2 - x1)), t2))
             lateral = True
-    # A standalone flick is one arrow endpoint. For a segmented note an
-    # explicitly stored tail arrow can add the final outgoing direction.
+    # A standalone flick counts as two points under the approved calibration.
+    # For a segmented note a tail arrow can add the final outgoing direction.
     flag = note.tail_direction if note.points else note.direction
     arrow = ('h', 1) if flag & 2 else ('h', -1) if flag & 8 else ('v', 1) if flag & 4 else ('v', -1) if flag & 16 else None
+    if not note.points and arrow is not None:
+        return [note.start, note.start]
     if arrow is not None:
-        directions.append(arrow)
+        directions.append((arrow, note.end))
     if not lateral and arrow is None:
-        return 0
-    compact = [d for i, d in enumerate(directions) if i == 0 or d != directions[i-1]]
-    return len(compact)  # (number of turns = segments-1) + one endpoint
+        return []
+    compact = [d for i, d in enumerate(directions) if i == 0 or d[0] != directions[i-1][0]]
+    # Turns occur when the next projected segment starts; the last point is
+    # the actual tail. Do not put a long chain's later turns at its head.
+    return [at for _, at in compact[1:]] + [note.end]
+
+
+def slide_points(note):
+    return len(slide_point_beats(note))
 
 
 def peak_density(times, seconds=4.0):
-    """Maximum head count in a half-open continuous [start,start+window)."""
+    """Maximum event count in a half-open continuous [start,start+window)."""
     times = sorted(times)
     end = best = 0
     best_start = times[0]
@@ -70,6 +79,49 @@ def peak_density(times, seconds=4.0):
         if end - start > best:
             best, best_start = end - start, times[start]
     return best / seconds, best, best_start
+
+
+def peak_hold_occupancy(intervals, first, last, seconds=8.0):
+    """Exact maximum integral of active straight holds over a fixed 8s window.
+
+    Short charts are zero-padded, keeping the same denominator. Window maxima
+    occur at a hold edge, or when an edge meets the window's other boundary.
+    """
+    if not math.isfinite(seconds) or seconds <= 0 or not math.isfinite(first) or not math.isfinite(last) or last < first:
+        raise ValueError('Invalid hold window')
+    events = defaultdict(int)
+    for start, end in intervals:
+        if not math.isfinite(start) or not math.isfinite(end) or end <= start or start < first or end > last:
+            raise ValueError('Invalid straight hold interval')
+        events[start] += 1
+        events[end] -= 1
+    if not events:
+        return 0.0, first
+    times = sorted(events)
+    areas, levels = [], []
+    area = 0.0
+    active = 0
+    previous = times[0]
+    for at in times:
+        area += (at - previous) * active
+        active += events[at]
+        areas.append(area)
+        levels.append(active)
+        previous = at
+
+    def integral(at):
+        index = bisect_right(times, at) - 1
+        return 0.0 if index < 0 else areas[index] + (at - times[index]) * levels[index]
+
+    latest = max(first, last - seconds)
+    candidates = {first, latest}
+    candidates.update(min(latest, max(first, at - offset)) for at in times for offset in (0, seconds))
+    best, best_start = 0.0, first
+    for start in sorted(candidates):
+        value = (integral(start + seconds) - integral(start)) / seconds
+        if value > best + 1e-10:
+            best, best_start = value, start
+    return best, best_start
 
 
 def speed_changes(chart, document, first, last):
@@ -106,11 +158,17 @@ def analyze(chart, document):
     if duration <= 0:
         raise ValueError('Non-positive chart duration')
     times = [clock.seconds(n.start) for n in chart.notes]
+    slide_times = [clock.seconds(at) for note in chart.notes for at in slide_point_beats(note)]
     groups = Counter(round(n.start, 8) for n in chart.notes)
     sizes = Counter(groups.values())
-    holds = sum(bool(n.points) and n.end > n.start and all(abs(x-n.x) < 1e-7 for _, x in n.points) and not n.direction and not n.tail_direction for n in chart.notes)
-    points = sum(slide_points(n) for n in chart.notes)
-    peak, peak_count, peak_start = peak_density(times)
+    hold_intervals = [(clock.seconds(n.start), clock.seconds(n.end)) for n in chart.notes
+                      if bool(n.points) and n.end > n.start and all(abs(x-n.x) < 1e-7 for _, x in n.points)
+                      and not n.direction and not n.tail_direction]
+    holds, hold_start = peak_hold_occupancy(hold_intervals, clock.seconds(first), clock.seconds(last))
+    points = len(slide_times)
+    head_peak, _, _ = peak_density(times)
+    peak, peak_count, peak_start = peak_density(times + slide_times)
+    in_window = lambda at: peak_start <= at and at - peak_start < 4 - 1e-9
     # IMD BPM is still used to time the other measurements. Its speed attribute
     # is set to zero for display, with a separate flag marking it unmeasured.
     if chart.source_format == 'IMD':
@@ -120,6 +178,12 @@ def analyze(chart, document):
     return {
         'notes': len(chart.notes), 'chord': sizes[3] + sizes[4],
         'peak': peak, 'hold': holds, 'slide': points / duration,
+        'hold_count': len(hold_intervals),
+        'hold_peak_start_s': hold_start - clock.seconds(first),
+        'hold_peak_end_s': hold_start - clock.seconds(first) + 8,
+        'head_peak': head_peak,
+        'peak_head_count': sum(in_window(at) for at in times),
+        'peak_slide_count': sum(in_window(at) for at in slide_times),
         'speed': speed * 60 / duration,
         'speed_status': 'disabled_imd_zero' if chart.source_format == 'IMD' else 'ready',
         'duration_s': duration,

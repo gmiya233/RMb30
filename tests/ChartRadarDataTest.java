@@ -16,9 +16,11 @@ public final class ChartRadarDataTest {
             for(int k=0;k<6;k++){check(data.radius(k,0)==0,"animation starts at center");check(Math.abs(data.radius(k,.5f)*2-data.radius(k,1))<1e-5,"halfway geometry");check(data.radius(k,2)==data.radius(k,1),"animation clamps");}
             if(data.format.equals("IMD")){check(data.values[3]==0&&!data.hell(3),"IMD speed zero");imd++;}
             if(data.cid==600214)check(data.hell(0)&&data.hell(1),"Vitamins HELL axes");
-            if(data.cid==604332)check(data.values[3]>450&&data.radius(3,1)==208,"uncapped value with bounded drawing");
+            if(data.cid==604332)check(Math.abs(data.values[3]-90)<1e-8,"New Astronomas speed reference is 90");
         }
         check(imd==46,"IMD coverage");JSONObject c=chart(rows.getJSONObject(0));fails(doc,"another server",c);
+        JSONObject overflow=new JSONObject(doc.toString());JSONObject overflowRow=overflow.getJSONArray("charts").getJSONObject(0);check(!overflowRow.getString("source_format").equals("IMD"),"overflow fixture uses MC");overflowRow.getJSONArray("values").put(3,1000);
+        ChartRadarData overflowData=ChartRadarData.find(overflow,server,c);check(overflowData.values[3]==1000&&overflowData.radius(3,1)==208,"uncapped value with bounded drawing");
         fails(doc,server,new JSONObject(c.toString()).put("server_hash","wrong"));
         fails(doc,server,new JSONObject(c.toString()).put("level",15));
         JSONObject reversed=new JSONObject(doc.toString());reversed.getJSONArray("axes").put(3,"hold");fails(reversed,server,c);
