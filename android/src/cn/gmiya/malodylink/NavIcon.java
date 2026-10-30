@@ -18,6 +18,8 @@ public final class NavIcon extends Drawable {
         else if(kind==9){p.moveTo(7,3);p.lineTo(17,3);p.lineTo(17,10);p.cubicTo(17,16,7,16,7,10);p.close();c.drawPath(p,paint);c.drawArc(3,4,9,12,90,180,false,paint);c.drawArc(15,4,21,12,-90,180,false,paint);c.drawLine(12,15,12,21,paint);c.drawLine(8,21,16,21,paint);}
         else if(kind==10){p.moveTo(9,17);p.lineTo(9,5);p.lineTo(20,3);p.lineTo(20,15);p.moveTo(9,9);p.lineTo(20,7);c.drawPath(p,paint);c.drawOval(3,16,9,21,paint);c.drawOval(14,14,20,19,paint);}
         else if(kind==11){c.drawRoundRect(8,8,21,21,2,2,paint);p.moveTo(16,4);p.lineTo(5,4);p.quadTo(3,4,3,6);p.lineTo(3,16);c.drawPath(p,paint);}
+        else if(kind==12){p.moveTo(14,5);p.lineTo(7,12);p.lineTo(14,19);c.drawPath(p,paint);}
+        else if(kind==13){c.drawCircle(12,12,9,paint);c.drawLine(12,11,12,17,paint);c.drawPoint(12,7,paint);}
         else{c.drawCircle(12,12,6.3f,paint);c.drawCircle(12,12,2.5f,paint);for(int i=0;i<8;i++){double a=i*Math.PI/4;c.drawLine(12+(float)Math.cos(a)*6.5f,12+(float)Math.sin(a)*6.5f,12+(float)Math.cos(a)*9,12+(float)Math.sin(a)*9,paint);}}
         c.restore();}
     @Override public void setAlpha(int a){paint.setAlpha(a);invalidateSelf();}

@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="19" android:versionName="1.5.3">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="44" android:versionName="1.6.23">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
   <uses-permission android:name="android.permission.INTERNET" />
@@ -12,7 +12,7 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
   <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
-  <queries><package android:name="moe.shizuku.privileged.api" /><package android:name="me.mugzone.emiria" /></queries>
+  <queries><package android:name="moe.shizuku.privileged.api" /><package android:name="me.mugzone.emiria" /><package android:name="com.tencent.mobileqq" /></queries>
   <application android:label="Malody Link" android:theme="@style/AppTheme" android:allowBackup="false" android:debuggable="false" android:usesCleartextTraffic="true" android:extractNativeLibs="true" android:icon="@drawable/icon">
     <meta-data android:name="moe.shizuku.client.V3_SUPPORT" android:value="true" />
     <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="cn.gmiya.malodylink.shizuku" android:multiprocess="false" android:enabled="true" android:exported="true" android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
@@ -22,7 +22,21 @@
     <activity android:name=".InternalReaderActivity" android:exported="false" />
     <activity android:name=".PlayerProfileActivity" android:exported="false" />
     <activity android:name=".SongCommunityActivity" android:exported="false" />
+    <activity android:name=".ChartPreviewActivity" android:exported="false" />
+    <activity android:name=".ChartRadarActivity" android:exported="false" android:theme="@style/RadarTheme" />
     <activity android:name=".UpdateActivity" android:exported="false" />
+    <activity android:name=".QqDownloadSettingsActivity" android:exported="false" />
+    <activity android:name=".ChartImportActivity" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.SEND"/><action android:name="android.intent.action.SEND_MULTIPLE"/>
+        <category android:name="android.intent.category.DEFAULT"/><data android:mimeType="*/*"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/><category android:name="android.intent.category.DEFAULT"/>
+        <data android:scheme="content"/><data android:mimeType="application/zip"/><data android:mimeType="application/x-zip-compressed"/><data android:mimeType="application/octet-stream"/>
+      </intent-filter>
+    </activity>
+    <provider android:name=".ChartImportProvider" android:authorities="cn.gmiya.malodylink.chartimports" android:exported="false" android:grantUriPermissions="true" />
     <provider android:name=".UpdateFileProvider" android:authorities="cn.gmiya.malodylink.updates" android:exported="false" android:grantUriPermissions="true">
       <grant-uri-permission android:pathPrefix="/apk/" />
     </provider>

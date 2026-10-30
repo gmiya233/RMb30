@@ -12,6 +12,20 @@ from publish_catalogue import public_catalogue
 
 
 class BotTests(unittest.TestCase):
+    def test_activity_and_six_k_commands(self):
+        base=json.loads((self.directory/'rt.json').read_bytes())
+        six=dict(base);six['players']=[dict(base['players'][0],rating=1.25,o=1.5,n=.75)]
+        self.write(self.directory/'6k.json',six)
+        self.assertIn('6K 综合',self.query.execute('6K榜'))
+        self.assertIn('1.2500',self.query.execute('6K榜'))
+        activity=dict(base);activity['players']=[dict(qq='10001',name='A',total=20,month=2),dict(qq='10002',name='B',total=5,month=4)]
+        self.write(self.directory/'activity.json',activity)
+        self.assertIn('1. A · 20次',self.query.execute('活跃榜 累计'))
+        self.assertIn('1. B · 4次',self.query.execute('活跃榜 月'))
+        self.assertIn('近30天',self.query.execute('月活跃榜'))
+        activity['server']='other';self.write(self.directory/'activity.json',activity)
+        self.assertIn('暂时不可用',self.query.execute('活跃榜'))
+
     def setUp(self):
         temporary_root = Path(__file__).resolve().parents[1] / 'build' / 'qqbot-tests'
         temporary_root.mkdir(parents=True, exist_ok=True)
@@ -92,6 +106,18 @@ class BotTests(unittest.TestCase):
         self.assertTrue(gate.accept('group', 'user', '2'))
         self.assertFalse(gate.accept('group', 'other', '3'))
         self.assertTrue(gate.accept('other-group', 'other', '4'))
+
+    def test_rating_help_works_without_catalogue_or_player_binding(self):
+        query = Queries(self.root / 'missing', self.root / 'missing-catalogue.json')
+        for command in ('rating', '<@!123> /rating', 'RATING', 'Rating', 'rating规则'):
+            reply = query.execute(command)
+            self.assertEqual(reply, Queries.RATING_HELP)
+        for part in ('0.97', '0.985', '1.02', '1.04', '(P ÷ 99.5)²',
+                     '(P − 99.5) ÷ 30', '1.01', '13.0000', '÷ 30',
+                     '空位按0算', '只取最高的一条', 'promote', 'SC1–4→12', '模拟设置不改变云端排行'):
+            self.assertIn(part, reply)
+        self.assertLess(len(reply), 1800)
+        self.assertIn('rating：', query.execute('帮助'))
 
     def test_hidden_creators_excluded_before_search_count_and_limit(self):
         names = ['阿峦', '夜語', 'ALWAYS_OVER', 'Kevin.X', '節奏大師譜面團隊',

@@ -15,7 +15,8 @@ public final class DefaultCatalog {
     public static synchronized String refresh(Context context,Engine engine,boolean force,Engine.Progress progress)throws Exception {
         JSONObject config=config(context);SharedPreferences settings=context.getSharedPreferences("settings",0);
         if(!force&&(!settings.getBoolean("default_reader",true)||!engine.server.equals(config.getString("server"))))return "";
-        if(!force&&System.currentTimeMillis()-settings.getLong("default_catalog_updated",0)<INTERVAL)return "";
+        int appVersion=context.getPackageManager().getPackageInfo(context.getPackageName(),0).versionCode;
+        if(!force&&settings.getInt("default_catalog_app_version",-1)==appVersion&&System.currentTimeMillis()-settings.getLong("default_catalog_updated",0)<INTERVAL)return "";
         progress.update("正在更新谱库目录…");
         URL url=new URL(config.getString("database_url"));if(!url.getProtocol().equals("http")&&!url.getProtocol().equals("https"))throw new IOException("无效谱库下载地址");
         HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(12000);connection.setReadTimeout(20000);
@@ -24,7 +25,7 @@ public final class DefaultCatalog {
         try{
             if(connection.getResponseCode()!=200)throw new IOException("谱库下载失败（HTTP "+connection.getResponseCode()+"）");
             byte[] bytes=Engine.read(connection.getInputStream(),16000000);engine.installDefaultCatalogue(bytes,config.getString("server"));
-            settings.edit().putLong("default_catalog_updated",System.currentTimeMillis()).apply();
+            settings.edit().putLong("default_catalog_updated",System.currentTimeMillis()).putInt("default_catalog_app_version",appVersion).apply();
         }finally{connection.disconnect();}
         try{if(engine.server.equals(RankConnection.config(context).getString("server"))){
             JSONObject keys=new JSONObject(new String(RankConnection.open(context).getPath("/_catalog/keys-v1.json",16000000),StandardCharsets.UTF_8));engine.installChartKeys(keys);

@@ -1,0 +1,115 @@
+name: iOS self-sign test package
+on:
+  push:
+    branches: [main, codex/ios-file-sync, codex/ios-android-parity]
+    paths: ['ios/**', 'tools/prepare_ios_resources.py', 'tools/normalize_ios_images.swift', '.github/workflows/ios-test.yml']
+  workflow_dispatch:
+    inputs:
+      package_only:
+        description: Build device IPA without running tests
+        type: boolean
+        default: false
+      startup_only:
+        description: Check optimized startup with complete bundled resources
+        type: boolean
+        default: false
+      layout_only:
+        description: Recheck settled landscape after full suite passed
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: ios-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test shared Swift core
+        if: inputs.package_only != true
+        run: swift test --package-path ios
+      - name: Prepare app resources
+        if: hashFiles('ios/project.yml') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p build/ios-resources
+          gh release download v1.6.11 --repo gmiya233/RMb30 --pattern '*.APK' --dir build/ios-resources
+          python3 tools/prepare_ios_resources.py --apk build/ios-resources/*.APK
+          swift tools/normalize_ios_images.swift ios/Resources
+          swift tools/create_ios_icon.swift ios/App/Assets.xcassets/AppIcon.appiconset
+          brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+          cd ios && xcodegen generate
+      - name: Build arm64 device app without signing
+        if: hashFiles('ios/project.yml') != ''
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/ios-device CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' build | tee build/ios-build.log
+          python3 tools/package_ios.py build/ios-device/Build/Products/Release-iphoneos/MalodyLink.app
+      - name: Check normal Release startup with full catalogue
+        if: inputs.package_only != true
+        run: |
+          set -o pipefail
+          xcodebuild -version
+          xcrun simctl list runtimes
+          DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPad" in d["name"]))')
+          xcrun simctl boot "$DEVICE" || true
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Release -parallel-testing-enabled NO -only-testing:MalodyLinkUITests/StartupUITests -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-release-simulator -resultBundlePath build/iOS-Release-Startup.xcresult test | tee build/ios-release-startup.log
+      - name: Export Release startup evidence
+        if: always() && hashFiles('build/iOS-Release-Startup.xcresult/Info.plist') != ''
+        run: xcrun xcresulttool export attachments --path build/iOS-Release-Startup.xcresult --output-path build/ios-screenshots/release-startup
+      - name: Check native navigation and local synthetic import on simulator
+        if: inputs.package_only != true && inputs.startup_only != true && hashFiles('ios/project.yml') != ''
+        run: |
+          set -o pipefail
+          DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPhone" in d["name"]))')
+          xcrun simctl boot "$DEVICE" || true
+          TEST_ARGS=('-only-testing:MalodyLinkUITests/AppUITests')
+          if [ "${{ inputs.layout_only }}" = "true" ]; then TEST_ARGS+=('-only-testing:MalodyLinkUITests/AppUITests/testLandscapeNavigation'); fi
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -parallel-testing-enabled NO "${TEST_ARGS[@]}" -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-UITests.xcresult test | tee build/ios-ui-tests.log
+      - name: Check iPad navigation and layouts
+        if: inputs.package_only != true && inputs.startup_only != true
+        run: |
+          set -o pipefail
+          DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import sys,json; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if "iPad" in d["name"]))')
+          xcrun simctl boot "$DEVICE" || true
+          TEST_ARGS=('-only-testing:MalodyLinkUITests/AppUITests')
+          if [ "${{ inputs.layout_only }}" = "true" ]; then TEST_ARGS+=('-only-testing:MalodyLinkUITests/AppUITests/testLandscapeNavigation'); fi
+          xcodebuild -project ios/MalodyLink.xcodeproj -scheme MalodyLink -configuration Debug -parallel-testing-enabled NO "${TEST_ARGS[@]}" -destination "platform=iOS Simulator,id=$DEVICE" -derivedDataPath build/ios-simulator -resultBundlePath build/iOS-iPad-UITests.xcresult test | tee build/ios-ipad-tests.log
+      - name: Export iPad screenshots
+        if: always() && hashFiles('build/iOS-iPad-UITests.xcresult/Info.plist') != ''
+        run: xcrun xcresulttool export attachments --path build/iOS-iPad-UITests.xcresult --output-path build/ios-screenshots/ipad
+      - name: Export simulator screenshots
+        if: always() && hashFiles('build/iOS-UITests.xcresult/Info.plist') != ''
+        run: xcrun xcresulttool export attachments --path build/iOS-UITests.xcresult --output-path build/ios-screenshots/iphone
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always() && hashFiles('build/ios-screenshots/**') != ''
+        with:
+          name: iOS-preview-screenshots
+          path: build/ios-screenshots
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: hashFiles('dist/*.ipa') != ''
+        with:
+          name: Malody-Link-iOS-self-sign-test
+          path: |
+            dist/*.ipa
+            dist/*.sha256
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: iOS-build-diagnostics
+          path: |
+            build/ios-build.log
+            build/ios-release-startup.log
+            build/iOS-Release-Startup.xcresult
+            build/ios-ui-tests.log
+            build/ios-ipad-tests.log
+            build/iOS-iPad-UITests.xcresult
+            build/iOS-UITests.xcresult
+          retention-days: 7

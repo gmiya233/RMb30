@@ -14,8 +14,19 @@ public final class CommunityRepository {
     public static CommunityData.Boards boards(Context c,Engine engine,boolean force)throws Exception {
         File target=file(c,engine,"boards");CommunityData.Boards cache=cachedBoards(c,engine);
         if(!force&&cache!=null&&System.currentTimeMillis()-target.lastModified()<60000)return cache;
-        byte[] bytes=open(c,engine).getPath("/_community/v1/boards.json",CommunityData.MAX_BYTES);CommunityData.Boards boards=CommunityData.boards(bytes,engine.server,revision(engine));
-        if(System.currentTimeMillis()-boards.doc.getLong("updated")>300000)throw new IOException("社区榜单暂未更新，请稍后刷新");ScoreStore.write(target,boards.doc);return boards;
+        byte[] bytes=open(c,engine).getPath("/_community/v1/boards.json",CommunityData.MAX_BYTES);
+        CommunityData.Boards boards=CommunityData.boardsWithRefresh(bytes,engine.server,revision(engine),()->{
+            if(!ScoreSyncGate.enter("catalogue"))throw new IOException("正在同步成绩，请完成后刷新榜单");
+            try{
+                Engine latest=new Engine(c);
+                if(!latest.profile.equals(engine.profile)||!latest.server.equals(engine.server))throw new IOException("存档或服务器已切换，请重新打开榜单");
+                engine.scores=latest.scores;engine.aliases=latest.aliases;
+                DefaultCatalog.refresh(c,engine,true,progress->{});return revision(engine);
+            }finally{ScoreSyncGate.leave("catalogue");}
+        });
+        if(System.currentTimeMillis()-boards.doc.getLong("updated")>300000)throw new IOException("社区榜单暂未更新，请稍后刷新");
+        // A catalogue refresh changes the namespace: never write new boards to the old cache.
+        ScoreStore.write(file(c,engine,"boards"),boards.doc);return boards;
     }
     public static JSONObject cachedSong(Context c,Engine engine,String topic){try{return CommunityData.song(ScoreStore.read(file(c,engine,CommunityData.topic(topic))),engine.server,revision(engine),topic);}catch(Exception absent){return null;}}
     public static JSONObject song(Context c,Engine engine,String topic)throws Exception {

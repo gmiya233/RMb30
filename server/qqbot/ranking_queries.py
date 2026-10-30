@@ -43,14 +43,44 @@ class Queries:
     HELP = ('小师妹 · 排行查询\n'
             '绑定 QQ号：设置本群默认查询QQ\n'
             'b30：返回已绑定QQ的O20+N10图片\n'
+            'rating：查看 rating 计算规则\n'
             '我的绑定 / 解绑：查看或解除绑定\n'
             '总榜 [页码]：综合 rating，每页10人\n'
             '查排名 QQ号：查询玩家排名\n'
             '查歌 歌名：搜索歌曲和谱面ID\n'
+            '谱面预览 歌名或谱面ID：整首直轨展开图\n'
             '单曲榜 谱面ID [页码]：单谱排行\n'
             '单曲榜 歌名：先搜索，再选择谱面ID\n'
+            '歌曲推荐：随机推荐曲绘、BPM、难度和排行\n'
+            '开启推荐 / 关闭推荐 / 推荐状态：本群每2小时推荐\n'
+            '6K榜：6K单独计算 O20+N10\n'
+            '6kb30 / 6K B30：已绑定QQ的6K专属成绩图\n'
+            '活跃榜 累计/月 [页码]：云端游玩次数\n'
             '例：单曲榜 604342\n'
             '请在群内 @我 后发送命令。')
+
+    RATING_HELP = (
+        '小师妹来讲讲 rating 怎么算～\n'
+        '这是本服的换算 rating，和 Malody 官方 MM 不同。\n\n'
+        '① 单曲 rating = 定级 × 准度系数 × 判定倍率\n'
+        '判定倍率：A判 0.97，B判 0.985，C判 1.00，D判 1.02，E判 1.04。\n'
+        '设准度为 P（例如 99.6%，P 就填 99.6）：\n'
+        'P < 99.5：系数 = (P ÷ 99.5)² ÷ 1.01\n'
+        '99.5 ≤ P < 99.8：系数 = [1 + (P − 99.5) ÷ 30] ÷ 1.01\n'
+        'P ≥ 99.8：系数固定为 1.00。\n'
+        '例如：13级、C判、99.5% = 12.8713；99.8%及以上 = 13.0000。\n\n'
+        '② 综合 rating =（O20 的单曲 rating 总和 + N10 的单曲 rating 总和）÷ 30\n'
+        'O20：普通歌曲中最高的20首；N10：服务器标为新歌（promote）的歌曲中最高的10首。\n'
+        '同一首歌的不同难度只取最高的一条；同歌只要有谱面属于新歌，就归入 N10，不重复进 O20。'
+        '不足20首或10首的空位按0算，所以先打满两栏也能提升总 rating 哦！\n\n'
+        '③ 定级口径\n'
+        '普通谱面：原等级低于16时直接使用；16→8，17–18→9，19–20→10，'
+        '21–23→11，24–26→12，27–29→13，30–32→14，33–35→15。\n'
+        '难度名含 SC 时优先使用：SC1–4→12，SC5–13→13，SC14及以上→15。'
+        '未提供有效定级或判定无法识别的成绩不计入。\n'
+        '排行榜使用上述默认倍率；App里的模拟设置不改变云端排行。\n'
+        '在 App 上传成绩后，发送 b30 就能查看已绑定QQ的成绩图～'
+    )
 
     def __init__(self, root, catalogue, clock=time.time):
         self.root, self.catalogue_file = Path(root), Path(catalogue)
@@ -74,7 +104,7 @@ class Queries:
             self._signature = signature
         return self._catalogue
 
-    def board(self, cid=0):
+    def board(self, cid=0, six=False):
         status = read_json(self.root / 'status.json', 100000)
         revision = status.get('revision', '')
         if status.get('schema') != 2 or not re.fullmatch('[a-f0-9]{64}', revision):
@@ -82,7 +112,7 @@ class Queries:
         server, charts = self.catalogue()
         if cid and cid not in charts:
             raise Unavailable('unknown chart')
-        doc = read_json(self.root / revision / ('rt.json' if not cid else f'charts/{cid}.json'))
+        doc = read_json(self.root / revision / ('6k.json' if six else 'rt.json' if not cid else f'charts/{cid}.json'))
         if doc.get('schema') != 2 or doc.get('revision') != revision or doc.get('server') != server or doc.get('cid') != cid:
             raise Unavailable('snapshot namespace mismatch')
         updated = number(doc.get('updated'), upper=10000000000000) / 1000
@@ -124,6 +154,27 @@ class Queries:
             warning += ' · 部分存档读取异常'
         return rows, f'榜单更新 {stamp}{warning}'
 
+    def activity(self, monthly=False):
+        status=read_json(self.root/'status.json',100000)
+        revision=status.get('revision','')
+        if status.get('schema')!=2 or not re.fullmatch('[a-f0-9]{64}',revision): raise Unavailable('invalid revision')
+        doc=read_json(self.root/revision/'activity.json')
+        if doc.get('schema')!=2 or doc.get('revision')!=revision or doc.get('server')!=self.catalogue()[0]: raise Unavailable('wrong activity namespace')
+        updated=number(doc.get('updated'),upper=10000000000000)/1000
+        if updated>self.clock()+300: raise Unavailable('future activity')
+        players=doc.get('players')
+        if not isinstance(players,list) or len(players)>10000: raise Unavailable('invalid activity')
+        rows=[];seen=set();key='month' if monthly else 'total'
+        for p in players:
+            qq=p.get('qq','');count=number(p.get(key))
+            if not isinstance(qq,str) or not re.fullmatch('[1-9][0-9]{4,11}',qq) or qq in seen or type(count)!=int: raise Unavailable('invalid activity player')
+            seen.add(qq)
+            if count: rows.append(dict(qq=qq,name=text(p.get('name') or '玩家'+qq[-4:]),count=count))
+        rows.sort(key=lambda r:(-r['count'],r['qq']))
+        for i,r in enumerate(rows):r['rank']=rows[i-1]['rank'] if i and r['count']==rows[i-1]['count'] else i+1
+        stamp=datetime.fromtimestamp(updated,ZoneInfo('Asia/Shanghai')).strftime('%m-%d %H:%M')
+        return rows,'榜单更新 '+stamp+(' · 数据更新延迟' if self.clock()-updated>120 else '')
+
     def search(self, query):
         terms = normalize(query).split()
         if not terms:
@@ -161,6 +212,20 @@ class Queries:
         try:
             if command in ('', '帮助', 'help', '菜单'):
                 return self.HELP
+            if command.casefold() in ('rating', 'rating说明', 'rating规则'):
+                return self.RATING_HELP
+            if command.casefold() in ('6k榜','6k排行','6k排行榜'):
+                rows,stamp=self.board(six=True)
+                selected,page=self.page(rows,arg or '1')
+                return '\n'.join(['6K 综合 rating 榜 · O20+N10',page]+[f"{r['rank']}. {r['name']} · {r['rating']:.4f}\n   O20 {r['o']:.4f} · N10 {r['n']:.4f}" for r in selected]+[stamp,'仅计算已确认6K谱面，缺位按0计。'])
+            if command in ('活跃榜','活跃度排行','累计活跃榜','月活跃榜'):
+                values=arg.split();monthly=command=='月活跃榜'
+                if values and values[0] in ('月','月榜','近30天','累计','总榜'):
+                    monthly=values.pop(0) in ('月','月榜','近30天')
+                if len(values)>1: return '用法：活跃榜 累计/月 [页码]'
+                rows,stamp=self.activity(monthly)
+                selected,page=self.page(rows,values[0] if values else '1')
+                return '\n'.join(['近30天活跃榜' if monthly else '累计活跃榜',page]+[f"{r['rank']}. {r['name']} · {r['count']:,}次" for r in selected]+[stamp,'按云端去重后的有效游玩记录统计，未上传的记录不计。'])
             if command in ('总榜', 'rt榜', '战力榜'):
                 rows, stamp = self.board()
                 selected, page = self.page(rows, arg or '1')

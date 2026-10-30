@@ -60,6 +60,16 @@ public final class OpenListScoreRemote implements CloudArchive.Remote {
             StringBuilder hex=new StringBuilder();for(byte b:digest.digest())hex.append(String.format(Locale.ROOT,"%02x",b&255));if(count!=release.size||!hex.toString().equals(release.digest))throw new IOException("安装包校验失败，请重新下载");
         }finally{connection.disconnect();}
     }
+    public void putTitle(String qq,byte[] bytes)throws Exception {
+        if(bytes.length>4096)throw new IOException("称号信息过大");String folder="/"+CloudRecords.qq(qq);
+        ok(api("/api/fs/mkdir",new JSONObject().put("path",folder)));
+        Map<String,String> headers=new HashMap<>();headers.put("Content-Type","application/json");headers.put("File-Path",folder+"/"+PlayerTitle.FILE);headers.put("As-Task","false");
+        ok(readJson(base+"/api/fs/put","PUT",bytes,headers,true,100000));
+    }
+    public void putAvatar(String qq,byte[] bytes)throws Exception {
+        if(bytes.length>1500000)throw new IOException("头像信息过大");String folder="/"+CloudRecords.qq(qq);ok(api("/api/fs/mkdir",new JSONObject().put("path",folder)));
+        Map<String,String> headers=new HashMap<>();headers.put("Content-Type","application/json");headers.put("File-Path",folder+"/player-avatar.json");headers.put("As-Task","false");ok(readJson(base+"/api/fs/put","PUT",bytes,headers,true,100000));
+    }
     @Override public void put(String qq,String name,byte[] bytes)throws Exception {
         if(bytes.length>CloudRecords.MAX_BYTES||!name.equals("scores-"+CloudRecords.sha256(bytes)+".json"))throw new IOException("待上传成绩文件校验失败");
         Map<String,String> headers=new HashMap<>();headers.put("Content-Type","application/octet-stream");headers.put("File-Path",path(qq,name));headers.put("As-Task","false");ok(readJson(base+"/api/fs/put","PUT",bytes,headers,true,100000));
