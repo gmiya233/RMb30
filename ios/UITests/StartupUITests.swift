@@ -9,7 +9,7 @@ final class StartupUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(zh-Hans)", "-AppleLocale", "zh_CN"]
         app.launch()
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 25), "Normal startup must present the home page")
-        let choose = app.buttons["选择 Malody V 文件夹"]
+        let choose = app.buttons["home.chooseMalodyFolder"]
         XCTAssertTrue(choose.waitForExistence(timeout: 20))
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: choose)
         XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 30), .completed, "Complete bundled catalogue must finish loading")

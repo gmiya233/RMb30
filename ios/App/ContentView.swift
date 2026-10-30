@@ -77,7 +77,7 @@ struct HomePage: View {
                 VStack(alignment: .leading, spacing: 8) {
                     if model.busy { ProgressView().accessibilityLabel("正在处理") }
                     HStack(spacing: 10) {
-                        if model.folderName.isEmpty { action("选择文件夹", "folder.badge.plus") { chooseFolder = true } }
+                        if model.folderName.isEmpty { action("选择文件夹", "folder.badge.plus") { chooseFolder = true }.accessibilityIdentifier("home.chooseMalodyFolder") }
                         else { action("本机同步", "arrow.triangle.2.circlepath") { model.importScores() } }
                         action("云端同步", "icloud.and.arrow.up") { model.syncCloud(upload: true) }
                     }
