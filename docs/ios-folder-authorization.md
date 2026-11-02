@@ -18,7 +18,9 @@
 
 - 新增 Swift 核心测试：有效目录书签往返和源文件不变；缺少 replay；误选 chart 子目录；文件冒充目录；符号链接；非文件 URL。
 - 本机 Windows 无 Xcode，编译和核心测试交由 GitHub macOS 工作流执行。使用 `package_only=true`，运行核心测试与 arm64 设备构建，不启动模拟器。
-- 当前状态：待云端编译及苹果真机验证。成功编译不等于跨 App 授权已修复。
+- GitHub Actions [41381753822](https://github.com/gmiya233/RMb30/actions/runs/41381753822) 已通过：19 项 Swift 核心测试（含 4 项新授权测试）零失败，arm64 Release 设备构建成功；未启动模拟器。
+- 测试 IPA：`Malody-Link-iOS-0.3.9-unsigned.ipa`，build 13，1,844,402 字节；SHA256 `8995f3b561bf15de17883b3fa147cee378444b49709d2cf8e5b526321b711181`。已核验设备平台、版本、原 Bundle ID、无调试夹具及无分发签名配置。
+- 当前状态：待苹果真机验证。成功编译不等于跨 App 授权已修复。
 
 ## 真机验证
 
