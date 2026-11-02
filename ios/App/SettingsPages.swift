@@ -7,7 +7,6 @@ struct SettingsPage: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var chooseFolder = false
     @State private var qq = ""
     @State private var name = ""
     @State private var title = ""
@@ -23,10 +22,10 @@ struct SettingsPage: View {
             VStack(spacing: 16) {
                 Card {
                     Label("首次使用 · 授权成绩文件夹", systemImage: "folder.badge.plus").font(.title3.bold()).foregroundStyle(Palette.accent)
-                    Text("1. 在「文件」中找到 Malody V 的目录。\n2. 选择同时包含 chart 和 replay 的根文件夹。\n3. 返回首页，点击「同步本机成绩」。").font(.subheadline)
+                    Text("1. 点击下面按钮，进入 Malody V 根目录。\n2. 看到 chart 和 replay 后，点右上角「打开」，不必逐个点文件。\n3. 等待显示「文件夹已授权」，再回首页点「本机同步」。").font(.subheadline)
                     Text("如系统未开放 Malody 的目录，可先在电脑上复制 chart 和 replay 到 iCloud Drive 的同一文件夹，再在这里授权。").font(.caption).foregroundStyle(.secondary)
                     Text(model.folderName.isEmpty ? "尚未授权" : "已授权：" + model.folderName).font(.caption)
-                    Button("选择 Malody V 文件夹") { chooseFolder = true }.buttonStyle(.borderedProminent).frame(minHeight: 44)
+                    Button("选择 Malody V 文件夹") { model.presentFolderPicker() }.buttonStyle(.borderedProminent).frame(minHeight: 44)
                 }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: typeSize.isAccessibilitySize ? 1 : 2), alignment: .leading, spacing: 12) {
                     action("批量导谱 / QQ 曲包", icon: "square.stack.3d.up") { model.showingPackages = true }
@@ -54,7 +53,7 @@ struct SettingsPage: View {
                 }
                 Card {
                     Text("关于").font(.headline)
-                    Text("Malody Link · iOS 0.3.1").font(.subheadline)
+                    Text("Malody Link · iOS " + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知")).font(.subheadline)
                     Button { Task { await checkUpdate() } } label: { Label(checking ? "检查中…" : "获取更新", systemImage: "arrow.down.app").frame(minHeight: 44) }.disabled(checking)
                     Text(updateStatus.isEmpty ? "iOS 包需自行签名安装，更新会打开 GitHub 发布页。" : updateStatus).font(.caption).foregroundStyle(.secondary)
                     Button("分享读取诊断") { share { try model.diagnosticURL() } }.frame(minHeight: 44)
@@ -70,7 +69,6 @@ struct SettingsPage: View {
             Task { if let data = try? await selected?.loadTransferable(type: Data.self), let image = UIImage(data: data), image.size.width > 0, image.size.height > 0, profile == model.qq { avatarCrop = AvatarCropSelection(image: image, profile: profile) } }
         }
         .sheet(item: $avatarCrop) { selection in AvatarCropEditor(selection: selection) }
-        .sheet(isPresented: $chooseFolder) { FolderPicker { url in chooseFolder = false; model.chooseFolder(url) } }
         .sheet(isPresented: $sharing) { if let shareURL { ShareSheet(items: [shareURL]) } }
     }
     private func action(_ name: String, icon: String, perform: @escaping () -> Void) -> some View {

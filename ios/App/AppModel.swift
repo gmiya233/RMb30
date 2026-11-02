@@ -27,7 +27,10 @@ import MalodyCore
     }
     @Published var showingPreview = false
     @Published var showingPackages = false
+    @Published var showingFolderPicker = false
     @Published var incomingPackages: [URL] = []
+    private var pendingFolder: URL?
+    private var folderEvents: [[String: String]] = []
     var previewBoard: ScoreBoard { showingPreview ? ScoreBoard(records: state.records, catalogue: catalogue, preview: preview) : board }
     private let store = StateStore(), importer = DirectoryImporter(), catalogues = CatalogueStore()
     var cloud: CloudGateway?
@@ -76,10 +79,47 @@ import MalodyCore
         board = ScoreBoard(records: state.records, catalogue: catalogue)
         recent = SongBrowse.recent(state.records, catalogue: catalogue)
     }
-    func chooseFolder(_ url: URL) {
-        guard !busy, ready else { return }
-        do { try DirectoryBookmark.save(url); folderName = url.lastPathComponent; status = "文件夹已授权，点击同步本机成绩" }
-        catch { self.error = error.localizedDescription }
+    private func folderEvent(_ phase: String, error: Error? = nil) {
+        var event = ["phase": phase, "at": ISO8601DateFormatter().string(from: Date())]
+        if let error { let value = error as NSError; event["error_domain"] = value.domain; event["error_code"] = String(value.code) }
+        // Intentionally omit selected paths, bookmark bytes and provider error descriptions.
+        folderEvents.append(event); folderEvents = Array(folderEvents.suffix(12))
+    }
+    func presentFolderPicker() {
+        guard ready, !busy, !showingPackages, !showingFolderPicker else { return }
+        error = nil; pendingFolder = nil; folderEvent("picker_presented")
+        status = "进入 Malody V 根目录后，点右上角「打开」"
+        showingFolderPicker = true
+    }
+    func folderSelected(_ url: URL) {
+        guard showingFolderPicker else { return }
+        pendingFolder = url; folderEvent("selection_received"); showingFolderPicker = false
+    }
+    func folderSelectionCancelled() {
+        pendingFolder = nil; showingFolderPicker = false; folderEvent("selection_cancelled")
+        status = folderName.isEmpty ? "尚未授权 Malody V 文件夹" : "已取消选择，原文件夹授权保留"
+    }
+    func finishFolderSelection() {
+        guard let url = pendingFolder else { return }
+        pendingFolder = nil; busy = true; status = "正在验证目录授权…"; folderEvent("validation_started")
+        // Do not start provider I/O inside the picker delegate or its dismissal transition.
+        task = Task {
+            defer { busy = false; task = nil }
+            do {
+                let authorization = try await Task.detached(priority: .userInitiated) {
+                    try DirectoryAuthorization.prepare(url)
+                }.value
+                try Task.checkCancellation()
+                DirectoryBookmark.save(authorization); folderName = authorization.name
+                status = "文件夹已授权，点击本机同步"; folderEvent("authorization_saved")
+            } catch is CancellationError {
+                status = "授权验证已取消，原文件夹授权保留"; folderEvent("validation_cancelled")
+            } catch {
+                folderEvent("validation_failed", error: error)
+                self.error = "目录授权未完成：" + error.localizedDescription
+                status = "目录授权未完成，原成绩和原文件夹授权保留"
+            }
+        }
     }
     func forgetFolder() {
         guard !busy else { return }; DirectoryBookmark.forget(); folderName = ""; status = "已解除本机目录关联，成绩记录保留"
@@ -253,7 +293,11 @@ import MalodyCore
         try? bytes.write(to: path, options: .atomic); return bytes
     }
     func diagnosticURL() throws -> URL {
-        var report: [String: Any] = ["app_version": "0.3.1-ios", "system": "iOS", "chart_count": catalogue.charts.count,
+        var report: [String: Any] = ["app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+                                      "app_build": Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown",
+                                      "system": UIDevice.current.systemName, "system_version": UIDevice.current.systemVersion,
+                                      "device_model": UIDevice.current.model, "folder_events": folderEvents,
+                                      "bookmark_present": UserDefaults.standard.data(forKey: "malody-folder-bookmark") != nil, "chart_count": catalogue.charts.count,
                                       "record_count": state.records.count, "directory_selected": !folderName.isEmpty,
                                       "catalogue_revision": catalogue.revision(), "created_at": ISO8601DateFormatter().string(from: Date())]
         if let lastImport { report["last_import"] = try JSONSerialization.jsonObject(with: JSONCoding.encode(lastImport)) }

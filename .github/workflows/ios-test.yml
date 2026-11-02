@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       package_only:
-        description: Build device IPA without running tests
+        description: Run core tests and build device IPA without launching simulators
         type: boolean
         default: false
       startup_only:
@@ -31,7 +31,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Test shared Swift core
-        if: inputs.package_only != true
         run: swift test --package-path ios
       - name: Prepare app resources
         if: hashFiles('ios/project.yml') != ''

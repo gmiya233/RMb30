@@ -6,18 +6,33 @@ import MalodyCore
 
 struct FolderPicker: UIViewControllerRepresentable {
     let selected: (URL) -> Void
-    func makeCoordinator() -> Coordinator { Coordinator(selected) }
+    let cancelled: () -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(selected: selected, cancelled: cancelled) }
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
         picker.delegate = context.coordinator; picker.allowsMultipleSelection = false
-        picker.directoryURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        // Leave the initial location to Files; our own Documents is not Malody's directory.
+        picker.shouldShowFileExtensions = true
         return picker
     }
-    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
+    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {
+        context.coordinator.selected = selected; context.coordinator.cancelled = cancelled
+    }
     final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let selected: (URL) -> Void
-        init(_ selected: @escaping (URL) -> Void) { self.selected = selected }
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { if let url = urls.first { selected(url) } }
+        var selected: (URL) -> Void
+        var cancelled: () -> Void
+        private var finished = false
+        init(selected: @escaping (URL) -> Void, cancelled: @escaping () -> Void) {
+            self.selected = selected; self.cancelled = cancelled
+        }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard !finished else { return }; finished = true
+            // Return to UIKit immediately. Directory/provider I/O runs after dismissal.
+            if let url = urls.first { selected(url) } else { cancelled() }
+        }
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            guard !finished else { return }; finished = true; cancelled()
+        }
     }
 }
 
@@ -74,13 +89,11 @@ actor StateStore {
 
 enum DirectoryBookmark {
     static func save(_ url: URL) throws {
-        let granted = url.startAccessingSecurityScopedResource(); defer { if granted { url.stopAccessingSecurityScopedResource() } }
-        let hasChart = FileManager.default.fileExists(atPath: url.appendingPathComponent("chart").path)
-        let hasReplay = FileManager.default.fileExists(atPath: url.appendingPathComponent("replay").path)
-        guard hasChart && hasReplay else { throw MalodyError.invalid("请选择同时包含 chart 和 replay 的 Malody V 根文件夹") }
-        let data = try url.bookmarkData(options: [.minimalBookmark], includingResourceValuesForKeys: nil, relativeTo: nil)
-        UserDefaults.standard.set(data, forKey: "malody-folder-bookmark")
-        UserDefaults.standard.set(url.lastPathComponent, forKey: "malody-folder-name")
+        save(try DirectoryAuthorization.prepare(url))
+    }
+    static func save(_ authorization: DirectoryAuthorization) {
+        UserDefaults.standard.set(authorization.bookmark, forKey: "malody-folder-bookmark")
+        UserDefaults.standard.set(authorization.name, forKey: "malody-folder-name")
     }
     static func resolve() throws -> URL {
         guard let data = UserDefaults.standard.data(forKey: "malody-folder-bookmark") else { throw MalodyError.invalid("请先选择 Malody V 文件夹") }

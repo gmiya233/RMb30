@@ -24,6 +24,10 @@ struct RootView: View {
         .sheet(isPresented: $model.showingPackages) {
             NavigationStack { ChartImportPage().toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { model.showingPackages = false } } } }
         }
+        .fullScreenCover(isPresented: $model.showingFolderPicker, onDismiss: model.finishFolderSelection) {
+            FolderPicker(selected: model.folderSelected, cancelled: model.folderSelectionCancelled)
+                .ignoresSafeArea()
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 Divider()
@@ -53,7 +57,6 @@ struct Card<Content: View>: View {
 
 struct HomePage: View {
     @EnvironmentObject var model: AppModel
-    @State private var chooseFolder = false
     @State private var avatarPhoto: PhotosPickerItem?
     @State private var avatarCrop: AvatarCropSelection?
     var body: some View {
@@ -77,9 +80,13 @@ struct HomePage: View {
                 VStack(alignment: .leading, spacing: 8) {
                     if model.busy { ProgressView().accessibilityLabel("正在处理") }
                     HStack(spacing: 10) {
-                        if model.folderName.isEmpty { action("选择文件夹", "folder.badge.plus") { chooseFolder = true }.accessibilityIdentifier("home.chooseMalodyFolder") }
+                        if model.folderName.isEmpty { action("选择文件夹", "folder.badge.plus") { model.presentFolderPicker() }.accessibilityIdentifier("home.chooseMalodyFolder") }
                         else { action("本机同步", "arrow.triangle.2.circlepath") { model.importScores() }.accessibilityIdentifier("home.syncLocalScores") }
                         action("云端同步", "icloud.and.arrow.up") { model.syncCloud(upload: true) }
+                    }
+                    if model.folderName.isEmpty {
+                        Text("进入 Malody V 根目录后，点右上角「打开」授权整个文件夹。")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     DisclosureGroup { Text(model.status).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) } label: { Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
                     if model.busy { Button("取消当前操作", role: .cancel) { model.cancel() }.frame(minHeight: 44) }
@@ -100,7 +107,6 @@ struct HomePage: View {
                 .frame(maxWidth: .infinity)
         }
         .navigationTitle("我的节奏").navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $chooseFolder) { FolderPicker { url in chooseFolder = false; model.chooseFolder(url) } }
         .sheet(item: $avatarCrop) { selection in AvatarCropEditor(selection: selection) }
         .onChange(of: avatarPhoto) { selected in
             let profile = model.qq
