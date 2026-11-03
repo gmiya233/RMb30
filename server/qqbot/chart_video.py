@@ -1,5 +1,5 @@
 """On-demand video jobs; one renderer, bounded queue, versioned persistent cache."""
-import asyncio,hashlib,json,os,shutil,signal,sys,tempfile
+import asyncio,hashlib,json,math,os,shutil,signal,sys,tempfile,time
 from dataclasses import dataclass
 from pathlib import Path
 from b30_commands import command_parts
@@ -15,12 +15,20 @@ class Plan:
  cover:Path
  output:Path
 
+class VideoCooldown(ValueError):
+ REPLY='小师妹打歌有点累了..等我休息五分钟再叫我吧！'
+
 class ChartVideos:
  COMMANDS={'谱面视频','视频预览'}
- def __init__(self,queries,playback,roots,state,renderer):
+ def __init__(self,queries,playback,roots,state,renderer,clock=None):
   self.queries=queries;self.playback=Path(playback);self.roots=list(map(Path,roots));self.state=Path(state);self.renderer=Path(renderer)
   self.state.mkdir(parents=True,exist_ok=True);self.tasks={};self.slot=asyncio.Semaphore(1)
   self.revision=(self.renderer.parent/'revision.txt').read_text().strip()
+  self.clock=clock or time.time;self.last_started=None
+  try:
+   stamp=float(json.loads((self.state/'cooldown.json').read_bytes())['last_started'])
+   if math.isfinite(stamp):self.last_started=min(stamp,self.clock())
+  except (OSError,ValueError,TypeError,KeyError):pass
  def resolve(self,content):
   _,arg=command_parts(content)
   if not arg or len(content)>200:return '用法：谱面视频 歌名或谱面ID。'
@@ -58,7 +66,12 @@ class ChartVideos:
   except (OSError,ValueError,KeyError,TypeError):return False
  def start(self,plan):
   if plan.key in self.tasks:return self.tasks[plan.key],False
+  if self.cached(plan):
+   ready=asyncio.get_running_loop().create_future();ready.set_result(plan.output);return ready,False
+  now=self.clock()
+  if self.last_started is not None and now<self.last_started+300:raise VideoCooldown(VideoCooldown.REPLY)
   if len(self.tasks)>=3:raise ValueError('视频生成队列已满，请稍后重试。')
+  stamp=self.state/'cooldown.tmp';stamp.write_text(json.dumps({'last_started':now}));stamp.replace(self.state/'cooldown.json');self.last_started=now
   task=asyncio.create_task(self.generate(plan));self.tasks[plan.key]=task
   def done(t):
    self.tasks.pop(plan.key,None)

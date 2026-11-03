@@ -1,7 +1,7 @@
 import asyncio,hashlib,json,sys,tempfile,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server/qqbot'))
-from chart_video import ChartVideos
+from chart_video import ChartVideos, VideoCooldown
 from video_upload import upload_video
 
 class Queries:
@@ -28,6 +28,19 @@ class VideoTests(unittest.IsolatedAsyncioTestCase):
   calls=[]
   async def fake(plan):calls.append(plan.key);await asyncio.sleep(.02);return plan.output
   self.videos.generate=fake;p=self.videos.resolve('谱面视频 Song');a,first=self.videos.start(p);b,second=self.videos.start(p);self.assertTrue(first);self.assertFalse(second);self.assertIs(a,b);await asyncio.gather(a,b);self.assertEqual(len(calls),1)
+ async def test_global_cooldown_persisted_and_cached_bypass(self):
+  now=[1000.0];self.videos.clock=lambda:now[0]
+  async def fake(plan):await asyncio.sleep(.001);return plan.output
+  self.videos.generate=fake;p=self.videos.resolve('谱面视频 123');task,_=self.videos.start(p);await task;await asyncio.sleep(0)
+  self.doc['revision']='different';self.write_doc();other=self.videos.resolve('谱面视频 123')
+  with self.assertRaisesRegex(VideoCooldown,'小师妹打歌有点累了'):self.videos.start(other)
+  restarted=ChartVideos(self.queries,self.root,[],self.root/'cache',self.root/'render.py',clock=lambda:now[0])
+  with self.assertRaises(VideoCooldown):restarted.start(other)
+  data=b'cached';other.output.write_bytes(data);other.output.with_suffix('.json').write_text(json.dumps({'key':other.key,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()}))
+  ready,first=restarted.start(other);self.assertFalse(first);self.assertEqual(await ready,other.output);self.assertEqual(restarted.last_started,1000)
+  now[0]=1299.99
+  with self.assertRaises(VideoCooldown):self.videos.start(p)
+  now[0]=1300;task,first=self.videos.start(p);self.assertTrue(first);await task
  async def test_multipart_exact_bytes_and_confirmations(self):
   p=self.root/'video.mp4';data=b'abcdefghij';p.write_bytes(data);chunks=[];requests=[]
   async def req(endpoint,payload):

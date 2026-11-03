@@ -11,7 +11,7 @@ from ranking_queries import Queries
 from b30_commands import B30Commands, command_parts
 from song_search import SongSearch
 from chart_preview import ChartPreviews
-from chart_video import ChartVideos
+from chart_video import ChartVideos, VideoCooldown
 from video_upload import upload_video
 from markdown_probe import probe
 from button_menu import COMMANDS as MENU_COMMANDS, send_menu
@@ -120,6 +120,8 @@ def main():
                 sequence+=1
                 if not isinstance(result,dict) or not result.get('id'):raise TimeoutError('Video send acknowledgement missing')
                 print('Chart video: accepted',flush=True)
+            except VideoCooldown:
+                await say(VideoCooldown.REPLY)
             except ValueError as error:
                 print('Chart video: unavailable ('+type(error).__name__+')',flush=True)
                 await say('视频生成队列已满，请稍后重试。' if str(error).startswith('视频生成队列') else '本次视频生成或上传未完成，请稍后重试；已生成的视频缓存会保留。')

@@ -111,3 +111,7 @@ SDK 初始化和回复失败日志只记录错误类别，不记录消息、凭�
 接口参考：[官方群聊预上传](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_id_upload_prepare.post.html)、[分片完成](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_id_upload_part_finish.post.html)、[群聊富媒体上传](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_files.post.html)。
 
 验证：`python -B -m unittest discover -s tests -p 'test_qqbot*.py'`包含缓存损坏、谱面/皮肤版本更新、命名空间和隐藏规则、并发去重、分片内容/确认及错误分片拒绝。已在Linux服务账号及实际systemd挂载内完成带原曲渲染检查，无主动测试群发。
+
+### 视频生成冷却
+
+每次接受新的生成任务后，全局冷却300秒（跨群、跨玩家）；冷却期间请求生成新视频回复“小师妹打歌有点累了..等我休息五分钟再叫我吧！”。已有缓存仍直接发送，正在制作的同一谱面继续共享任务，两者不刷新冷却。冷却时间写入私有videos/cooldown.json，重启保留；从任务接受时开始计时，生成失败也不提前清零。
