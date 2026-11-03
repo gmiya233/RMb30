@@ -1,7 +1,7 @@
 package cn.gmiya.malodylink;
 import android.content.Context;import android.graphics.*;import android.view.View;import java.util.*;
 final class GameplayView extends View {
- Bitmap background;GameplayChart chart;double time,approach=2;boolean followScroll=false;private final Paint p=new Paint(3);private final Path path=new Path();private final Map<String,Bitmap> sprites=new HashMap<>();
+ Bitmap background;GameplayChart chart;double time,approach=GameplayMotion.approachForSpeed(2);boolean followScroll=false;private final Paint p=new Paint(3);private final Path path=new Path();private final Map<String,Bitmap> sprites=new HashMap<>();
  GameplayView(Context c){super(c);setContentDescription("AUTO自动游玩预览，不记录成绩");}
  double distance(double at){return followScroll?chart.travel(at)-chart.travel(time):at-time;}
  float y(double at){return (float)GameplayMotion.y(distance(at),approach,getHeight());}
