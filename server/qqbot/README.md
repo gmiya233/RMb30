@@ -95,3 +95,19 @@ SDK 初始化和回复失败日志只记录错误类别，不记录消息、凭�
 客户端与机器人共用 `/_song_art/v2/index.json` 中的当前谱面曲绘映射。索引包含 CID、谱面 hash 与图片内容 SHA-256；不再信任旧的 CID 同名缓存。目录发布服务通过 `MALODY_PUBLIC_ART_ROOT` 指向可写的曲绘挂载，机器人通过 `MALODY_QQ_PROFILES` 读取头像目录。
 
 部署 systemd 目录挂载时，源和目标间的冒号须作为字段分隔符；不要将整个 `源:目标` 包在同一对引号中。保持目录读写范围限制，并在重启后确认 `QQ bot connected`，不能仅凭启动命令成功判断在线。
+
+## 按需谱面视频
+
+`@小师妹 谱面视频 歌名或谱面ID`（别名`视频预览`）。多谱面匹配先列出ID，不擅自选择难度。菜单的「谱面视频」按钮填入指令，等待玩家补充歌曲。
+
+首次查询先回复“这是该谱面当前版本的首次生成”，再异步生成完整带原曲视频并发送。缓存命中直接发送，不再渲染。相同谱面并发查询共用一个任务，等待者提示已加入任务。全局一个低优先级渲染进程，最多三个不同谱面任务（含等待），不占用查榜请求槽位。等待超过150秒会告知仍在后台制作、稍后查询缓存；单次渲染限180秒，超时终止整个子进程组，失败不写有效缓存。
+
+缓存位于机器人私有`STATE_DIRECTORY/videos`，重启保留。缓存键包含时间线内容、谱面服务器身份、曲绘内容、歌曲标题与难度、渲染器及全部素材版本；谱面或皮肤变更会生成新键。视频和摘要原子替换，仅完整、大小及SHA256校验通过的视频可复用。只读取已发布playback时间线、去重音乐及公开曲绘，不读取玩家原始成绩、执行MC脚本或Lua。当前支持4/5/6K，完整视频最长10分钟、输出不超过30MiB。
+
+机器人运行环境额外安装`numpy`和`imageio-ffmpeg`。将`tools/render_gameplay_video.py`部署到`/opt/malody-video-renderer/tools/`；保留其`android/assets/gameplay-skin/1712474142416.png`和`rm-notes/`相对目录。在`/opt/malody-video-renderer/tools/revision.txt`写入渲染器源码及所有素材的内容摘要，更新任意文件后重新计算。可用配置`video_renderer`覆盖脚本绝对路径。系统需有NotoSansCJK常规和粗体字体。playback通过现有chart-previews只读挂载访问，不新增源谱面或私有恢复状态挂载。
+
+视频使用QQ官方群聊分片上传：`upload_prepare` → HTTPS PUT分片 → `upload_part_finish` → `/files`合并 → 回复原请求。兼容文档中的0起始与线上实际1起始的连续分片编号，按数组偏移切割文件、按服务端编号确认。PUT不附带机器人鉴权，不新开公网端口，不使用超过5MB的base64直传。QQ上传失败保留本地视频缓存，下次查询重新上传。已使用A Site完整缓存视频核验真实预上传、PUT、分片确认及合并成功；群内最终视频展示仍由测试群确认。
+
+接口参考：[官方群聊预上传](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_id_upload_prepare.post.html)、[分片完成](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_id_upload_part_finish.post.html)、[群聊富媒体上传](https://bot.q.qq.com/wiki/develop/api-v2/autogen/api/v2_groups_group_openid_files.post.html)。
+
+验证：`python -B -m unittest discover -s tests -p 'test_qqbot*.py'`包含缓存损坏、谱面/皮肤版本更新、命名空间和隐藏规则、并发去重、分片内容/确认及错误分片拒绝。已在Linux服务账号及实际systemd挂载内完成带原曲渲染检查，无主动测试群发。

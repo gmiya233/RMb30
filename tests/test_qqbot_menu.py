@@ -11,8 +11,8 @@ class MenuTests(unittest.TestCase):
     def test_actions_need_input_before_sending(self):
         menu=payload('fixture')
         buttons=[b for row in menu['keyboard']['content']['rows'] for b in row['buttons']]
-        self.assertEqual(len(buttons),16)
-        self.assertEqual(len({b['id'] for b in buttons}),16)
+        self.assertEqual(len(buttons),17)
+        self.assertEqual(len({b['id'] for b in buttons}),17)
         for b in buttons:
             action=b['action'];command,arg=command_parts(action['data'])
             self.assertEqual(action['type'],2)

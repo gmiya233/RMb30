@@ -11,6 +11,8 @@ from ranking_queries import Queries
 from b30_commands import B30Commands, command_parts
 from song_search import SongSearch
 from chart_preview import ChartPreviews
+from chart_video import ChartVideos
+from video_upload import upload_video
 from markdown_probe import probe
 from button_menu import COMMANDS as MENU_COMMANDS, send_menu
 from recommendations import Recommendations, COMMANDS as RECOMMEND_COMMANDS
@@ -62,6 +64,11 @@ def main():
     gate = Gate()
     song_search = SongSearch(queries, b30.font, [b30.artwork, Path(config['catalogue']).parent / 'thumbs'])
     previews = ChartPreviews(queries, config.get('chart_previews', '/var/lib/malody-qqbot/chart-previews'))
+    try:
+        videos = ChartVideos(queries, previews.root / 'playback', song_search.roots, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'videos', config.get('video_renderer', '/opt/malody-video-renderer/tools/render_gameplay_video.py'))
+    except (OSError,ValueError):
+        videos=None
+        print("Chart video renderer unavailable; other commands remain active",flush=True)
     slots = asyncio.Semaphore(8)
     allowed = set(config.get('allowed_groups', []))
     recommendations = Recommendations(queries, b30.font, song_search.roots, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'recommendations.sqlite3')
@@ -80,6 +87,45 @@ def main():
             result=await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=payload)
             if not isinstance(result,dict) or not result.get('id'):
                 raise TimeoutError('Image message acknowledgement missing')
+
+        async def video_reply(self,message):
+            from botpy.http import Route
+            import aiohttp
+            sequence=1
+            async def say(content):
+                nonlocal sequence
+                await self.api.post_group_message(group_openid=message.group_openid,msg_type=0,msg_id=message.id,msg_seq=sequence,content='\n'+content)
+                sequence+=1
+            try:
+                if videos is None:
+                    await say("谱面视频服务暂不可用，请稍后重试。其他查询功能不受影响。");return
+                plan=await asyncio.to_thread(videos.resolve,message.content)
+                if isinstance(plan,str):
+                    await say(plan);return
+                if not await asyncio.to_thread(videos.cached,plan):
+                    task,first=videos.start(plan)
+                    await say('这是该谱面当前版本的首次生成，正在制作完整视频，请稍候。完成后会发送，后续查询直接使用缓存。' if first else '这张谱面的视频正在生成中，已加入同一任务，无需重复生成。')
+                    try:await asyncio.wait_for(asyncio.shield(task),timeout=150)
+                    except asyncio.TimeoutError:
+                        await say('视频仍在后台排队或生成，请稍后再次发送同一指令；完成后会直接读取缓存。');return
+                async def request(endpoint,payload):
+                    return await self.http.request(Route('POST','/v2/groups/{group_openid}/'+endpoint,group_openid=message.group_openid),json=payload)
+                async def put(url,data):
+                    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+                        async with session.put(url,data=data,allow_redirects=False) as response:
+                            if response.status not in (200,201,204):raise ValueError('Video part upload failed')
+                            await response.read()
+                media=await upload_video(request,put,plan.output)
+                result=await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=message.group_openid),json={'msg_type':7,'msg_id':message.id,'msg_seq':sequence,'content':' ','media':{'file_info':media['file_info']}})
+                sequence+=1
+                if not isinstance(result,dict) or not result.get('id'):raise TimeoutError('Video send acknowledgement missing')
+                print('Chart video: accepted',flush=True)
+            except ValueError as error:
+                print('Chart video: unavailable ('+type(error).__name__+')',flush=True)
+                await say('视频生成队列已满，请稍后重试。' if str(error).startswith('视频生成队列') else '本次视频生成或上传未完成，请稍后重试；已生成的视频缓存会保留。')
+            except Exception as error:
+                print('Chart video: failed ('+type(error).__name__+')',flush=True)
+                await say('本次视频生成或上传未完成，请稍后重试；已生成的视频缓存会保留。')
 
         async def recommendation_loop(self):
             while True:
@@ -111,6 +157,9 @@ def main():
             if not gate.accept(message.group_openid, message.author.member_openid, message.id):
                 return
             try:
+                if command_parts(message.content)[0] in ChartVideos.COMMANDS:
+                    await self.video_reply(message)
+                    return
                 async with slots:
                     command, argument = command_parts(message.content)
                     if command in RECOMMEND_COMMANDS:
