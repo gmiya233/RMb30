@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="44" android:versionName="1.6.23">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="cn.gmiya.malodylink" android:versionCode="46" android:versionName="1.6.25">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
   <uses-permission android:name="android.permission.INTERNET" />
@@ -22,6 +22,7 @@
     <activity android:name=".InternalReaderActivity" android:exported="false" />
     <activity android:name=".PlayerProfileActivity" android:exported="false" />
     <activity android:name=".SongCommunityActivity" android:exported="false" />
+    <activity android:name=".GameplayActivity" android:exported="false" android:theme="@style/RadarTheme" />
     <activity android:name=".ChartPreviewActivity" android:exported="false" />
     <activity android:name=".ChartRadarActivity" android:exported="false" android:theme="@style/RadarTheme" />
     <activity android:name=".UpdateActivity" android:exported="false" />

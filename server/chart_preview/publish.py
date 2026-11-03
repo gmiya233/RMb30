@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 import time
 
 from render import VERSION, SKIN, MAX_BYTES, parse, render
+from autoplay import publish_one
 
 
 def atomic(path, data):
@@ -60,6 +61,7 @@ def publish(catalogue, source, output, state, font_path):
         cid = row['cid']
         if type(cid) is not int or cid <= 0:
             continue
+        publish_one(catalogue, row, source, output)
         manifest = output / f'{cid}.json'
         base = {'schema': 1, 'server': catalogue['server'], 'cid': cid, 'server_hash': row['server_hash'], 'skin': 'EX Rhythm Master VI', 'renderer': VERSION}
         try:

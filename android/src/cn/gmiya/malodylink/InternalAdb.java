@@ -53,7 +53,7 @@ public final class InternalAdb extends AbsAdbConnectionManager {
         for(int i=0;i<path.length();i++)if(path.charAt(i)<32)throw new SecurityException("路径含控制字符");
         for(String part:path.split("/"))if(part.equals(".")||part.equals(".."))throw new SecurityException("不允许跳出Malody目录");
         String root=ReadOnlyService.ROOT,lower=path.toLowerCase(Locale.ROOT);
-        boolean chart=path.startsWith(root+"/chart/")&&(lower.endsWith(".mc")||lower.endsWith(".jpg")||lower.endsWith(".jpeg")||lower.endsWith(".png")||lower.endsWith(".webp"));
+        boolean chart=path.startsWith(root+"/chart/")&&(lower.endsWith(".mc")||lower.endsWith(".imd")||lower.endsWith(".ogg")||lower.endsWith(".mp3")||lower.endsWith(".wav")||lower.endsWith(".m4a")||lower.endsWith(".jpg")||lower.endsWith(".jpeg")||lower.endsWith(".png")||lower.endsWith(".webp"));
         if(!chart&&!(path.startsWith(root+"/replay/")&&path.endsWith(".mrv")))throw new SecurityException("只允许读取Malody谱面、曲绘和回放");return path;
     }
     private static String quote(String s){return "'"+s.replace("'","'\"'\"'")+"'";}
