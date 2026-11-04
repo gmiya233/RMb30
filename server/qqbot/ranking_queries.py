@@ -1,5 +1,6 @@
 """Read-only queries over the existing Java-generated v2 leaderboard snapshots."""
 import json
+from new_player_guide import COMMANDS as GUIDE_COMMANDS, GUIDE
 import math
 from pathlib import Path
 import re
@@ -41,7 +42,8 @@ def number(value, lower=0, upper=1000000000000):
 
 class Queries:
     HELP = ('小师妹 · 排行查询\n'
-            '绑定 QQ号：设置本群默认查询QQ\n'
+            '新手教程：绑定、设置服务器、读取和上传成绩的全流程\n'
+            '绑定 QQ号：设置跨群共用查询QQ\n'
             'b30：返回已绑定QQ的O20+N10图片\n'
             'rating：查看 rating 计算规则\n'
             '我的绑定 / 解绑：查看或解除绑定\n'
@@ -211,6 +213,8 @@ class Queries:
         parts = content.split(maxsplit=1)
         command, arg = (parts + [''])[:2] if parts else ('', '')
         try:
+            if command in GUIDE_COMMANDS:
+                return GUIDE
             if command in ('', '帮助', 'help', '菜单'):
                 return self.HELP
             if command.casefold() in ('rating', 'rating说明', 'rating规则'):
