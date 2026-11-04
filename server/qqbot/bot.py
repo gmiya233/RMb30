@@ -15,7 +15,7 @@ from chart_video import ChartVideos, VideoCooldown
 from video_upload import upload_video
 from markdown_probe import probe
 from button_menu import COMMANDS as MENU_COMMANDS, send_menu
-from recommendations import Recommendations, COMMANDS as RECOMMEND_COMMANDS
+from recommendations import Recommendations, COMMANDS as RECOMMEND_COMMANDS, enable_failure_hint
 
 
 class Gate:
@@ -177,7 +177,7 @@ def main():
                                 await self.send_card(group,image)
                             except Exception as error:
                                 print('Enable recommendation: proactive probe failed ('+type(error).__name__+')',flush=True)
-                                reply='自动推荐尚未开启：主动发送未成功。请在QQ群机器人设置允许主动推送后重试；仍可发送“歌曲推荐”手动查询。'
+                                reply=enable_failure_hint(error)
                             else:
                                 reply=await asyncio.to_thread(recommendations.enable,group)
                                 print('Enable recommendation: proactive delivery accepted; schedule enabled',flush=True)

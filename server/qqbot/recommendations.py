@@ -13,6 +13,13 @@ from song_search import render, load_rankings, artwork
 INTERVAL = 7200
 COMMANDS = {'歌曲推荐','随机推荐','推荐歌曲','开启推荐','关闭推荐','推荐状态'}
 
+def enable_failure_hint(error):
+    if type(error).__name__=='ServerError':
+        return '自动推荐尚未开启：QQ平台主动发送接口返回服务错误。请稍后重新发送“开启推荐”；这次不能确定是群权限问题。现在仍可发送“歌曲推荐”手动查看。'
+    if isinstance(error,TimeoutError):
+        return '自动推荐尚未开启：等待QQ平台确认发送超时，请稍后重试。现在仍可发送“歌曲推荐”手动查看。'
+    return '自动推荐尚未开启：主动发送未获确认，暂时无法确定原因。请稍后重试；若持续失败，请群主检查是否允许机器人主动推送，也可发送“歌曲推荐”手动查看。'
+
 
 class Recommendations:
     def __init__(self, queries, font, roots, database, clock=time.time):
