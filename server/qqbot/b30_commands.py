@@ -17,9 +17,9 @@ def command_parts(content):
 class B30Commands:
     COMMANDS = {'b30', '6kb30', '6k', '6k成绩图', '绑定', '绑定qq', '解绑', '我的绑定'}
 
-    def __init__(self, queries, bindings, summaries, font, artwork):
+    def __init__(self, queries, bindings, summaries, font, artwork, legacy_groups=()):
         self.queries = queries
-        self.bindings = Bindings(bindings)
+        self.bindings = Bindings(bindings,legacy_groups)
         self.summaries, self.font, self.artwork = Path(summaries), font, artwork
 
     def execute(self, group, member, content):
@@ -37,15 +37,15 @@ class B30Commands:
                 self.bindings.set(group, member, arg)
             except ValueError as error:
                 return str(error)
-            return '已设置本群默认查询QQ。发送 b30 即可查看云端成绩图；如尚未上传成绩，请先在App中同步云端。'
+            return '已设置跨群共用的查询QQ。在小师妹所在的群发送 b30 即可查看云端成绩图；如尚未上传成绩，请先在App中同步云端。'
         if command == '解绑':
             self.bindings.remove(group, member)
-            return '已解除本群的默认查询QQ，云端成绩保留。'
+            return '已解除跨群共用的查询QQ，云端成绩保留。'
         qq = self.bindings.get(group, member)
         if not qq:
-            return '首次使用请先发送“绑定 你的QQ号”（App上传成绩使用的QQ），以后在本群发送 b30 即可自动出图。官方机器人不能直接获取真实QQ号。'
+            return '首次使用请先发送“绑定 你的QQ号”（App上传成绩使用的QQ），之后在小师妹所在的群发送 b30 即可自动出图。若旧群绑定未迁移，可在旧群发送一次“我的绑定”。官方机器人不能直接获取真实QQ号。'
         if command == '我的绑定':
-            return f'本群默认查询QQ：{qq}。更换请发送“绑定 新QQ号”，解除请发送“解绑”。'
+            return f'跨群共用查询QQ：{qq}。更换请发送“绑定 新QQ号”，解除请发送“解绑”（所有群生效）。'
         if arg:
             return '直接发送 b30 即可查询已绑定的QQ；更换请发送“绑定 新QQ号”。'
         try:

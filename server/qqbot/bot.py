@@ -60,7 +60,7 @@ def main():
     b30 = B30Commands(queries, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'bindings.sqlite3',
                       config.get('b30', '/var/lib/malody-qqbot/catalog-source/b30'),
                       config.get('font', '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'),
-                      config.get('artwork', '/var/lib/malody-qqbot/artwork'))
+                      config.get('artwork', '/var/lib/malody-qqbot/artwork'),legacy_groups=config.get('allowed_groups',[]))
     gate = Gate()
     song_search = SongSearch(queries, b30.font, [b30.artwork, Path(config['catalogue']).parent / 'thumbs'])
     previews = ChartPreviews(queries, config.get('chart_previews', '/var/lib/malody-qqbot/chart-previews'))
