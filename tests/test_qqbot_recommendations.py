@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'server/qqbot'))
-from recommendations import Recommendations,INTERVAL
+from recommendations import Recommendations,INTERVAL,enable_failure_hint
 
 class RecommendationTests(unittest.TestCase):
     def setUp(self):
@@ -18,6 +18,13 @@ class RecommendationTests(unittest.TestCase):
             def board(q,cid): return [],'fixture'
         self.args=(Queries(),'fixture',[],Path(self.temp.name)/'rec.sqlite3')
         self.rec=Recommendations(*self.args,clock=lambda:self.now)
+
+    def test_platform_permission_error_is_not_mistaken_for_outage(self):
+        class ServerError(RuntimeError):
+            def __init__(self,msg):self.msgs=msg
+        self.assertIn('40034105',enable_failure_hint(ServerError('主动消息失败, 无权限')))
+        self.assertNotIn('服务错误',enable_failure_hint(ServerError('unknown response')))
+        self.assertIn('超时',enable_failure_hint(TimeoutError()))
 
     def test_schedule_is_opt_in_persistent_and_no_catchup_flood(self):
         self.assertEqual(self.rec.due(set()),[])

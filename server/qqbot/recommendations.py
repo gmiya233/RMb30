@@ -14,8 +14,13 @@ INTERVAL = 7200
 COMMANDS = {'歌曲推荐','随机推荐','推荐歌曲','开启推荐','关闭推荐','推荐状态'}
 
 def enable_failure_hint(error):
+    # botpy 1.2.1 labels unrecognized HTTP statuses ServerError, including 400;
+    # the class name does not establish a QQ service outage.
+    reason=str(getattr(error,'msgs',''))
+    if '主动消息' in reason and '无权限' in reason:
+        return '自动推荐尚未开启：QQ平台拒绝了本群主动消息权限（40034105）。请群主在本群的小师妹机器人设置中检查并允许主动推送，再发送“开启推荐”。旧群的授权不会自动带到新群；现在仍可发送“歌曲推荐”手动查看。'
     if type(error).__name__=='ServerError':
-        return '自动推荐尚未开启：QQ平台主动发送接口返回服务错误。请稍后重新发送“开启推荐”；这次不能确定是群权限问题。现在仍可发送“歌曲推荐”手动查看。'
+        return '自动推荐尚未开启：QQ平台没有接受主动发送，请稍后重试；若持续失败，请群主检查本群机器人主动推送权限。现在仍可发送“歌曲推荐”手动查看。'
     if isinstance(error,TimeoutError):
         return '自动推荐尚未开启：等待QQ平台确认发送超时，请稍后重试。现在仍可发送“歌曲推荐”手动查看。'
     return '自动推荐尚未开启：主动发送未获确认，暂时无法确定原因。请稍后重试；若持续失败，请群主检查是否允许机器人主动推送，也可发送“歌曲推荐”手动查看。'
