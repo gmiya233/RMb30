@@ -28,9 +28,9 @@ def fit_pulse(events,start,end,bpm):
  distance=np.abs((selected[:,None]*bpm/60-phases[None,:]+.5)%1-.5)
  return float(np.exp(-.5*(distance/.07)**2).sum(axis=0).max())
 
-def analyze(y,sr,minimum=60,maximum=240,hint=None):
+def analyze(y,sr,minimum=60,maximum=240,hint=None,onset_override=None):
  hop=220;fps=sr/hop
- onset=librosa.onset.onset_strength(y=y,sr=sr,hop_length=hop,n_fft=1024,n_mels=64)
+ onset=librosa.onset.onset_strength(y=y,sr=sr,hop_length=hop,n_fft=1024,n_mels=64) if onset_override is None else np.asarray(onset_override,dtype=float)
  onset=np.maximum(0,onset-np.percentile(onset,35));peak=float(np.percentile(onset,98))
  if peak<1e-6:raise ValueError('音频中没有足够清晰的节奏，无法可靠估计')
  onset=np.clip(onset/peak,0,3)

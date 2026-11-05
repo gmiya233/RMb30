@@ -2,6 +2,9 @@
 device-inspection/
 tools/python-libs/
 tools/tempo-libs/
+tools/beat-libs/
+tools/beat-extra/
+tools/models/
 tools/pip-cache/
 assets/fonts/radar-preview/
 __pycache__/
