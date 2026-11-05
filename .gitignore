@@ -1,6 +1,8 @@
 .server-inspection/
 device-inspection/
 tools/python-libs/
+tools/tempo-libs/
+tools/pip-cache/
 assets/fonts/radar-preview/
 __pycache__/
 .cache/
