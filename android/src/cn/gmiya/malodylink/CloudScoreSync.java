@@ -26,12 +26,22 @@ public final class CloudScoreSync {
             CloudArchive.Result result=CloudArchive.sync(cached,qq,engine.server,engine.scores,engine.charts(),upload,progress::update);
             if(!qq.equals(ScoreStore.profile(context)))throw new IOException("QQ存档已切换，本次未写入本地成绩");
             ScoreStore.write(ScoreStore.file(context,engine.profile,"scores.json"),result.merged.scores);engine.scores=result.merged.scores;
+            String titleStatus=CloudAvatar.sync(context,engine,source,upload);if(upload)try{publishTitle(context,engine,source);titleStatus+=" 称号已同步。";}catch(Exception titleFailure){titleStatus+=" 称号同步未完成，下次上传会重试。";}
             String ranking="";if(upload)try{RankingPublisher.publish(context,source,engine,progress);ranking=" 排行索引已更新。";}catch(Exception indexFailure){ranking=" 成绩已保存，排行索引更新未完成；下次合并同步会重试。";}
             String message=(upload?"云端合并完成":"云端拉取完成")+"：本机新增 "+result.downloaded+" 条，上传 "+result.uploaded+" 条，共 "+engine.scores.length()+" 条。"+
                 (result.merged.conflicts>0?" 同ID冲突 "+result.merged.conflicts+" 条，保留本机版本；云端原件保留。":"")+
-                (result.merged.skipped>0?" 跳过不属于当前谱库或格式不符的记录。":"")+ranking;
+                (result.merged.skipped>0?" 跳过不属于当前谱库或格式不符的记录。":"")+ranking+titleStatus;
             context.getSharedPreferences("cloud",0).edit().putLong("last_sync",System.currentTimeMillis()).putString("last_result",message).putBoolean("last_ok",true).apply();return message;
         }catch(Exception e){context.getSharedPreferences("cloud",0).edit().putString("last_result","云端同步未完成，本机成绩保留。"+(e.getMessage()==null?"请稍后重试。":e.getMessage())).putBoolean("last_ok",false).apply();throw e;}
+    }
+    private static void publishTitle(Context c,Engine engine,OpenListScoreRemote source)throws Exception {
+        if(!engine.profile.equals(ScoreStore.profile(c))||!engine.server.equals(RankConnection.config(c).getString("server")))throw new IOException("称号存档或服务器已切换");
+        source.putTitle(engine.profile,PlayerTitle.pack(engine.profile,engine.server,LocalPlayerProfile.selectedTitleKey(c,engine)));
+    }
+    public static String titleOnly(Context c)throws Exception {
+        if(!ScoreSyncGate.enter("cloud"))throw new IllegalStateException("正在同步，称号将在下次上传时重试");
+        try{Engine engine=new Engine(c);publishTitle(c,engine,remote(c));RankingRepository.invalidate(c,engine);return "称号已同步到服务器。";}
+        finally{ScoreSyncGate.leave("cloud");}
     }
     public static String run(Context c,boolean upload,Engine.Progress callback)throws Exception {
         if(!ScoreSyncGate.enter("cloud"))throw new IllegalStateException("其他同步正在进行，请稍候");

@@ -11,7 +11,7 @@ def main():
     classes = BUILD / 'classes'
     classes.mkdir(parents=True, exist_ok=True)
     names = ['ChartMatcher', 'ChartDetails', 'ChartKeys', 'RatingRules', 'RatingBoard', 'SongCatalogue',
-             'CloudRecords', 'CloudArchive', 'RankingData', 'RankingIndex']
+             'CloudRecords', 'CloudArchive', 'PlayerTitle', 'RankingData', 'RankingIndex']
     sources = [ROOT / f'android/src/cn/gmiya/malodylink/{name}.java' for name in names]
     sources.append(ROOT / 'server/RankingDaemon.java')
     subprocess.run(['javac', '--release', '17', '-encoding', 'UTF-8', '-cp',

@@ -19,9 +19,9 @@ def creator_filter():
 
 def public_catalogue(doc):
     visible = creator_filter()
-    fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote')
+    fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote', 'server_hash')
     return {'server': doc['server'], 'charts': [
-        {k: row[k] for k in fields if k in row} | {'search_visible': visible(str(row.get('creator') or '')), 'artworks': artwork_candidates(row)}
+        {k: row[k] for k in fields if k in row} | {'search_visible': visible(str(row.get('creator') or '')) or (row.get('cid') == 604386 and str(row.get('title', '')).casefold().strip() == 'we luv lama' and 'imddesigner' not in str(row.get('creator', '')).casefold()), 'artworks': artwork_candidates(row)}
         for row in doc['charts']]}
 
 
@@ -61,10 +61,18 @@ def publish_b30(catalogue, target):
         if not re.fullmatch('[1-9][0-9]{4,11}', qq):
             raise ValueError('Invalid player identifier')
         # rt.json is published just before private state; skip during that tiny transition.
-        if any(player[k] != ranked[qq][k] for k in ('rating', 'o', 'n', 'oc', 'nc', 'name')):
+        if any(player.get(k) != ranked[qq].get(k) for k in ('rating', 'o', 'n', 'oc', 'nc', 'name', 'title')):
             continue
         doc = prepare(player, catalogue, revision, totals['updated'])
         atomic(target / 'b30' / revision / (qq + '.json'), json.dumps(doc, ensure_ascii=False, separators=(',', ':')).encode())
+        six=player.get('extra_boards',{}).get('six')
+        if six and six.get('best'):
+            six=dict(six,name=player['name'],title=player.get('title',''))
+            six_catalogue=dict(catalogue,charts=[c for c in catalogue['charts'] if c.get('keys')==6])
+            six_doc=prepare(six,six_catalogue,revision,totals['updated'])
+            six_doc['keys']=6
+            atomic(target/'b30'/revision/(qq+'-6k.json'),json.dumps(six_doc,ensure_ascii=False,separators=(',',':')).encode())
+
 
 
 def main():
@@ -78,6 +86,8 @@ def main():
     if chart_source:
         from artwork_fallback import supplement
         supplement(doc['charts'], chart_source, target.parent / 'thumbs', atomic)
+    from public_artwork import publish
+    publish(doc, target, atomic)
     public = public_catalogue(doc)
     data = json.dumps(public, ensure_ascii=False, separators=(',', ':')).encode()
     if not target.exists() or target.read_bytes() != data:

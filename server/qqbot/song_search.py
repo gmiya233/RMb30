@@ -1,3 +1,4 @@
+from song_buttons import SongCard, send_actions
 """A single-song search returns an illustrated card; ambiguous searches stay text."""
 from io import BytesIO
 from pathlib import Path
@@ -46,7 +47,7 @@ def section_height(board):
     return 142 + 58 * max(1, len(board['rows']) if board else 0)
 
 
-def render(rows, font_path, roots, boards=None):
+def render(rows, font_path, roots, boards=None, heading="小师妹 · 歌曲信息"):
     shown = rows[:12]
     boards = boards or {}
     width, height = 1200, 477 + sum(section_height(boards.get(row['cid'])) for row in shown)
@@ -68,7 +69,7 @@ def render(rows, font_path, roots, boards=None):
         draw.rounded_rectangle((52, 58, 332, 338), radius=20, fill='#d9f1ee')
         label(116, 177, '暂无曲绘', 30, '#667e8b', 210)
     first = rows[0]
-    label(364, 58, '小师妹 · 歌曲信息', 24, '#087b87', 770)
+    label(364, 58, heading, 24, '#087b87', 770)
     label(364, 111, first.get('title') or '未命名', 42, limit=770)
     label(364, 190, '歌手：' + (first.get('artist') or '未知'), 28, limit=770)
     label(364, 237, 'BPM：' + str(first.get('bpm') or '未知'), 28, limit=770)
@@ -127,7 +128,7 @@ class SongSearch:
             rows = sorted((row for row in self.queries.catalogue()[1].values()
                            if row.get('search_visible', True) is True and identity(row) == selected),
                           key=lambda row: row['cid'])
-            return render(rows, self.font, self.roots, load_rankings(self.queries, rows))
+            return SongCard(render(rows, self.font, self.roots, load_rankings(self.queries, rows)), rows)
         except (OSError, ValueError, TypeError, KeyError, AttributeError):
             # Metadata/image failures should not suppress useful search results.
             return self.queries.execute(content)

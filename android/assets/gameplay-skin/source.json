@@ -1,0 +1,10 @@
+{
+  "name": "EX Rhythm Master VI 250314",
+  "authors": [
+    "dreamcat",
+    "Acc@9961",
+    "Sam_0324"
+  ],
+  "archive_sha256": "7d0131c13f5bfa80c184f51552149925fe7c87e5a2e0fdeafcbe95f51f9cbbf3",
+  "usage": "User-supplied skin image assets for static chart previews. Lua and ASM are not executed."
+}

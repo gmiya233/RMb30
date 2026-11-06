@@ -1,0 +1,31 @@
+[Unit]
+Description=Malody static straight-lane chart preview publisher
+After=malody-ranking-catalog.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/malody-chart-preview
+ExecStart=/opt/malody-qqbot/venv/bin/python -B /opt/malody-chart-preview/publish.py --config /etc/malody-chart-preview/config.json
+Restart=on-failure
+RestartSec=15
+StateDirectory=malody-chart-preview
+StateDirectoryMode=0700
+Nice=10
+MemoryMax=384M
+UMask=0022
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=tmpfs
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+StandardOutput=journal
+StandardError=journal
+# Deployment drop-in supplies only read-only chart mounts and the dedicated derived output.
+
+[Install]
+WantedBy=multi-user.target

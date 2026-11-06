@@ -14,4 +14,17 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:forceDarkAllowed">false</item>
     </style>
+    <style name="RadarTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#080C18</item>
+        <item name="android:colorBackground">#080C18</item>
+        <item name="android:colorBackgroundFloating">#151C2D</item>
+        <item name="android:colorAccent">#FF709D</item>
+        <item name="android:textColorPrimary">#F6F7FC</item>
+        <item name="android:textColorSecondary">#A9B5CA</item>
+        <item name="android:statusBarColor">#080C18</item>
+        <item name="android:navigationBarColor">#080C18</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
 </resources>

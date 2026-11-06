@@ -68,4 +68,4 @@ def prepare(player, catalogue, revision, updated):
     if len(old) != player['oc'] or len(new) != player['nc']:
         raise ValueError('B30 does not match Java slot counts')
     return dict(schema=1, server=catalogue['server'], revision=revision, updated=updated,
-                qq=player['qq'], name=player['name'], rating=total, o=old_rating, n=new_rating, old=old, new=new)
+                qq=player['qq'], name=player['name'], player_title=str(player.get('title') or '')[:128], rating=total, o=old_rating, n=new_rating, old=old, new=new)
