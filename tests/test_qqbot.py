@@ -111,7 +111,8 @@ class BotTests(unittest.TestCase):
         query = Queries(self.root / 'missing', self.root / 'missing-catalogue.json')
         for command in ('rating', '<@!123> /rating', 'RATING', 'Rating', 'rating规则'):
             reply = query.execute(command)
-            self.assertEqual(reply, Queries.RATING_HELP)
+            self.assertTrue(reply.endswith(Queries.RATING_HELP))
+            self.assertIn('当前理论上限暂时无法读取', reply)
         for part in ('0.97', '0.985', '1.02', '1.04', '(P ÷ 99.5)²',
                      '(P − 99.5) ÷ 30', '1.01', '13.0000', '÷ 30',
                      '空位按0算', '只取最高的一条', 'promote', 'SC1–4→12', '模拟设置不改变云端排行'):

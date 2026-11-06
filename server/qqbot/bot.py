@@ -1,3 +1,4 @@
+from song_buttons import SongCard, send_actions
 """QQ official bot adapter. Only replies to an explicit group mention."""
 import asyncio
 from collections import OrderedDict
@@ -87,6 +88,9 @@ def main():
             result=await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=payload)
             if not isinstance(result,dict) or not result.get('id'):
                 raise TimeoutError('Image message acknowledgement missing')
+            async def send_song_actions(data):
+                return await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=data)
+            await send_actions(send_song_actions, image, message_id)
 
         async def video_reply(self,message):
             from botpy.http import Route
@@ -219,6 +223,9 @@ def main():
                             raise TimeoutError('QQ image upload did not return media')
                         await self.api.post_group_message(group_openid=message.group_openid, msg_type=7, msg_id=message.id,
                                                           content=' ', media={'file_info': media['file_info']})
+                        async def send_search_actions(data):
+                            return await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=message.group_openid),json=data)
+                        await send_actions(send_search_actions, reply, message.id)
                     else:
                         await self.api.post_group_message(group_openid=message.group_openid, msg_type=0,
                                                           msg_id=message.id, content='\n' + reply[:1800])

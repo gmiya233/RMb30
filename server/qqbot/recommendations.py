@@ -1,3 +1,4 @@
+from song_buttons import SongCard, send_actions
 """Random song cards and persistent, opt-in two-hour group schedules."""
 import json
 from pathlib import Path
@@ -60,7 +61,7 @@ class Recommendations:
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('INSERT OR IGNORE INTO recommendations(group_id) VALUES (?)',(group,))
             db.execute('UPDATE recommendations SET history=? WHERE group_id=?',(json.dumps((history+[json.dumps(selected)])[-20:]),group))
-        return image
+        return SongCard(image, rows)
 
     def enable(self,group):
         due=self.clock()+INTERVAL

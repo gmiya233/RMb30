@@ -1,6 +1,7 @@
 """Read-only queries over the existing Java-generated v2 leaderboard snapshots."""
 import json
 from new_player_guide import COMMANDS as GUIDE_COMMANDS, GUIDE
+from theoretical_rating import calculate as theoretical_rating, summary as theoretical_summary
 import math
 from pathlib import Path
 import re
@@ -105,7 +106,18 @@ class Queries:
                 charts[cid] = row
             self._catalogue = doc['server'], charts
             self._signature = signature
+            self._theoretical = None
         return self._catalogue
+
+    def rating_help(self):
+        try:
+            _, charts = self.catalogue()
+            if self._theoretical is None:
+                self._theoretical = theoretical_rating(charts.values())
+            ceiling = theoretical_summary(self._theoretical)
+        except (Unavailable, OSError, KeyError, TypeError, ValueError, AttributeError):
+            ceiling = '当前理论上限暂时无法读取，请稍后重试；以下计算规则仍可查看。'
+        return ceiling + '\n\n' + self.RATING_HELP
 
     def board(self, cid=0, six=False):
         status = read_json(self.root / 'status.json', 100000)
@@ -218,7 +230,7 @@ class Queries:
             if command in ('', '帮助', 'help', '菜单'):
                 return self.HELP
             if command.casefold() in ('rating', 'rating说明', 'rating规则'):
-                return self.RATING_HELP
+                return self.rating_help()
             if command.casefold() in ('6k榜','6k排行','6k排行榜'):
                 rows,stamp=self.board(six=True)
                 selected,page=self.page(rows,arg or '1')

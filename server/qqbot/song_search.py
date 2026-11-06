@@ -1,3 +1,4 @@
+from song_buttons import SongCard, send_actions
 """A single-song search returns an illustrated card; ambiguous searches stay text."""
 from io import BytesIO
 from pathlib import Path
@@ -127,7 +128,7 @@ class SongSearch:
             rows = sorted((row for row in self.queries.catalogue()[1].values()
                            if row.get('search_visible', True) is True and identity(row) == selected),
                           key=lambda row: row['cid'])
-            return render(rows, self.font, self.roots, load_rankings(self.queries, rows))
+            return SongCard(render(rows, self.font, self.roots, load_rankings(self.queries, rows)), rows)
         except (OSError, ValueError, TypeError, KeyError, AttributeError):
             # Metadata/image failures should not suppress useful search results.
             return self.queries.execute(content)
