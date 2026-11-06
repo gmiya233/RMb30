@@ -45,20 +45,45 @@ def segment_beats(beats,duration):
  return {'duration':duration,'segments':segments,'changes':[{'time':s['start'],'from_bpm':segments[i-1]['bpm'],'to_bpm':s['bpm'],'needs_review':s['uncertain'] or segments[i-1]['uncertain']} for i,s in enumerate(segments) if i],'curve':curve,'method':'audio-only Beat This! small0 + PELT beat-grid regression; no chart used','beats':beats.tolist()}
 
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('audio',type=Path);ap.add_argument('--out',type=Path,default=ROOT/'dist/neural-tempo-amara');ap.add_argument('--model',choices=['small0','final0'],default='small0');ap.add_argument('--decoder',choices=['beat-grid','probability'],default='beat-grid');args=ap.parse_args()
+ ap=argparse.ArgumentParser();ap.add_argument('audio',nargs='?',type=Path);ap.add_argument('--out',type=Path,default=ROOT/'dist/audio-tempo-grid');ap.add_argument('--model',choices=['small0','final0'],default='final0');ap.add_argument('--decoder',choices=['beat-grid','probability','phase-grid','grid-verified'],default='grid-verified');args=ap.parse_args()
+ gui=args.audio is None
+ if gui:
+  import tkinter as tk
+  from tkinter import filedialog
+  window=tk.Tk();window.withdraw();selected=filedialog.askopenfilename(title='选择音频：检测分段BPM与变速点',filetypes=[('音频','*.mp3 *.ogg *.wav *.m4a')]);window.destroy()
+  if not selected:return
+  args.audio=Path(selected);args.out=args.out/time.strftime('%Y%m%d-%H%M%S')
+ def finish(d):
+  export(d,args.audio,args.out)
+  if gui:
+   import webbrowser
+   webbrowser.open((args.out/'report.html').resolve().as_uri())
  model=ROOT/'tools/models'/f'beat-this-{args.model}.ckpt';model.parent.mkdir(parents=True,exist_ok=True)
  if not model.exists():
   print('Downloading official model weights to E:',flush=True)
   with urllib.request.urlopen(f'https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/{args.model}.ckpt',timeout=45) as r:model.write_bytes(r.read())
  start=time.monotonic();y,sr=decode(args.audio);print('Audio decoded; starting CPU inference with 2 threads',flush=True)
  tracker=Audio2Beats(checkpoint_path=str(model),device='cpu',dbn=False)
- if args.decoder=='probability':
-  beat_logits,_=Audio2Frames.__call__(tracker,y,sr)
+ if args.decoder in ('probability','phase-grid','grid-verified'):
+  beat_logits,down_logits=Audio2Frames.__call__(tracker,y,sr)
   prob=beat_logits.sigmoid().cpu().numpy()
+  if args.decoder in ('phase-grid','grid-verified'):
+   from tempo_grid import grid_decode
+   import librosa
+   audio_onset=librosa.onset.onset_strength(y=y,sr=sr,hop_length=441,n_fft=1024,n_mels=64)
+   audio_onset=np.clip(audio_onset/max(float(np.percentile(audio_onset,98)),1e-6),0,1)
+   args.out.mkdir(parents=True,exist_ok=True)
+   np.savez_compressed(args.out/'features.npz',beat=prob,down=down_logits.sigmoid().cpu().numpy(),onset=audio_onset,duration=len(y)/sr)
+   grid=grid_decode(prob,down_logits.sigmoid().cpu().numpy(),audio_onset,len(y)/sr)
+   if args.decoder=='phase-grid':
+    grid['model']=args.model;finish(grid);print('Phase-grid trajectory exported',flush=True);return
   onset=np.interp(np.arange(int(len(y)/220)+1)*220/sr,np.arange(len(prob))/50,prob)
   d=analyze(y,sr,onset_override=onset);d['method']='Beat This '+args.model+' neural beat probabilities + constrained tempo trajectory, audio only';d['model']=args.model
-  export(d,args.audio,args.out);print('Probability trajectory exported',flush=True);return
+  if args.decoder=='grid-verified':
+   from tempo_grid import verify_segments
+   d=verify_segments(d,grid)
+  finish(d);print('Verified trajectory exported',flush=True);return
  beats,downbeats=tracker(y,sr);print('Detected',len(beats),'beats,',len(downbeats),'downbeats; elapsed',round(time.monotonic()-start,1),flush=True)
  d=segment_beats(np.asarray(beats),len(y)/sr);d['downbeats']=np.asarray(downbeats).tolist();d['model']=args.model
- export(d,args.audio,args.out);print(json.dumps({'segments':d['segments'],'elapsed_seconds':round(time.monotonic()-start,1)},ensure_ascii=False),flush=True)
+ finish(d);print(json.dumps({'segments':d['segments'],'elapsed_seconds':round(time.monotonic()-start,1)},ensure_ascii=False),flush=True)
 if __name__=='__main__':main()

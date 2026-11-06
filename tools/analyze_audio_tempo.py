@@ -92,12 +92,15 @@ def export(doc,source,out):
  out.mkdir(parents=True,exist_ok=True)
  (out/'tempo.json').write_text(json.dumps(doc,ensure_ascii=False,indent=2),encoding='utf-8')
  with (out/'tempo.csv').open('w',newline='',encoding='utf-8-sig') as f:
-  w=csv.writer(f);w.writerow(['开始秒','结束秒','估计BPM','节奏强度(非概率)','需复核','半速/倍速候选'])
-  for s in doc['segments']:w.writerow([s['start'],s['end'],s['bpm'],s['rhythm_strength'],s['uncertain'],' / '.join(map(str,s['alternatives']))])
+  w=csv.writer(f);w.writerow(['开始秒','结束秒','估计BPM','节奏强度(非概率)','需复核','半速/倍速候选','网格一致比例','复核原因'])
+  for s in doc['segments']:w.writerow([s['start'],s['end'],s['bpm'],s['rhythm_strength'],s['uncertain'],' / '.join(map(str,s['alternatives'])),s.get('grid_agreement',''),'；'.join(s.get('review_reasons',[]))])
  ymin=min(p['bpm'] for p in doc['curve'])-10;ymax=max(p['bpm'] for p in doc['curve'])+10
  points=' '.join(f"{40+920*p['time']/doc['duration']:.1f},{240-200*(p['bpm']-ymin)/(ymax-ymin):.1f}" for p in doc['curve'])
- rows=''.join(f"<tr><td>{s['start']:.2f}–{s['end']:.2f}s</td><td>{s['bpm']:g}</td><td>{s['rhythm_strength']:.2f}</td><td>{'需复核' if s['uncertain'] else '检测到节奏'}</td><td>{' / '.join(map(str,s['alternatives']))}</td></tr>" for s in doc['segments'])
+ rows=''.join(f"<tr><td>{s['start']:.2f}–{s['end']:.2f}s</td><td>{s['bpm']:g}</td><td>{s['rhythm_strength']:.2f}</td><td>{'需复核' if s['uncertain'] else '检测到节奏'}</td><td>{' / '.join(map(str,s['alternatives']))}</td><td>{html.escape('；'.join(s.get('review_reasons',[])) or ('原算法提示弱节奏或短片段' if s['uncertain'] else '未发现明显冲突，仍需校拍'))}</td></tr>" for s in doc['segments'])
  page=f'''<!doctype html><meta charset="utf-8"><title>BPM检测结果</title><style>body{{font:16px system-ui;background:#101b29;color:#e4f2ff;max-width:1100px;margin:40px auto;padding:20px}}svg{{background:#17283c;width:100%;border-radius:16px}}td,th{{padding:14px;text-align:left;border-bottom:1px solid #345}}table{{width:100%}}p{{line-height:1.8;color:#b1c7dc}}</style><h1>{html.escape(source.name)} · BPM检测</h1><p>纯音频估计 · 曲线用于寻找变速段。表格时间不是精确节拍锚点；半速/倍速存在歧义。节奏强度是算法指标，不是正确概率。</p><svg viewBox="0 0 1000 280"><polyline points="{points}" fill="none" stroke="#63dfd2" stroke-width="2"/><text x="40" y="265" fill="white">0s</text><text x="900" y="265" fill="white">{doc['duration']:.1f}s</text><text x="5" y="25" fill="white">{ymax:g}</text><text x="5" y="240" fill="white">{ymin:g}</text></svg><h2>分段 BPM / 疑似变速点</h2><table><tr><th>时间</th><th>BPM</th><th>节奏强度</th><th>状态</th><th>半速/倍速候选</th></tr>{rows}</table>'''
+ page=page.replace('<th>半速/倍速候选</th>','<th>半速/倍速候选</th><th>网格复核</th>')
+ if 'grid_verification' in doc:
+  page=page.replace('<h2>分段', '<p>已启用第二种相位网格与重拍检查。方法之间一致不等于 BPM 正确；分歧、累计漂移及半速／倍速／三连音歧义会标记复核，不自动覆盖候选。</p><h2>分段')
  (out/'report.html').write_text(page,encoding='utf-8')
 
 def main():
