@@ -16,6 +16,8 @@ public struct Chart: Codable, Identifiable, Hashable {
     public let bpm: String
     public let cover: String
     public let background: String
+    public var judgementCount: Int? = nil
+    public var judgementRule: String = ""
     public var declaredKeys: Int? = nil
     public var keysSource: String = ""
     public var keys: Int? {
@@ -39,6 +41,7 @@ public struct Chart: Codable, Identifiable, Hashable {
         case cid, sid, path, version, mode, title, artist, creator, bpm, cover, background
         case serverHash = "server_hash", filename = "mc_name", rawLevel = "level", promoted = "promote"
         case declaredKeys = "keys", keysSource = "keys_source"
+        case judgementCount = "judgement_count", judgementRule = "judgement_rule"
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -50,6 +53,7 @@ public struct Chart: Codable, Identifiable, Hashable {
         promoted = ((try? c.decode(Bool.self, forKey: .promoted)) ?? false) || ((try? c.decode(Int.self, forKey: .promoted)) == 1)
         title = text(.title); artist = text(.artist); creator = text(.creator); cover = text(.cover); background = text(.background)
         bpm = (try? c.decode(String.self, forKey: .bpm)) ?? (try? c.decode(Double.self, forKey: .bpm)).map { Rating.formatLevel($0) } ?? ""
+        judgementCount = try? c.decode(Int.self, forKey: .judgementCount); judgementRule = text(.judgementRule)
         declaredKeys = try? c.decode(Int.self, forKey: .declaredKeys); keysSource = (try? c.decode(String.self, forKey: .keysSource)) ?? ""
     }
 }
@@ -61,13 +65,13 @@ public struct Catalogue: Codable {
     public var byCID: [Int: Chart] { Dictionary(charts.map { ($0.cid, $0) }, uniquingKeysWith: { first, _ in first }) }
     public var promotedSongs: Set<String> { Set(charts.filter { $0.promoted || $0.path.hasPrefix("promote/") }.map(\.identity)) }
     public func revision() -> String {
-        var key = "index-v3-c998-normalized:"
+        var key = "index-v4-whole-accuracy:"
         func part(_ value: String) { key += "\(value.utf16.count):\(value)" }
         part(server)
         for c in charts.sorted(by: { $0.cid < $1.cid }) {
             part(String(c.cid)); part(String(c.sid)); part(c.serverHash); part(c.version)
             part(c.rawLevel.flatMap { $0.isFinite ? Rating.formatLevel($0) : nil } ?? "?")
-            part(c.promoted ? "1" : "0"); part(c.path)
+            part(c.promoted ? "1" : "0"); part(c.path); part(c.judgementRule); part(String(c.judgementCount ?? 0))
         }
         return Digests.sha256(Data(key.utf8))
     }

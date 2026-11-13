@@ -10,6 +10,10 @@ class AutoplayTests(unittest.TestCase):
    doc={'meta':{'mode':7},'time':[{'beat':[0,0,1],'bpm':120},{'beat':[4,0,1],'bpm':240}],'note':[{'beat':[2,0,1],'x':32,'w':60,'seg':[{'beat':[4,0,1],'x':64}]},{'beat':[0,0,1],'sound':'test.ogg','offset':269}]}
    (song/'a.mc').write_text(json.dumps(doc));(song/'test.ogg').write_bytes(b'synthetic audio')
    self.assertEqual(publish_one(cat,row,root,out),'published');m=json.loads((out/'playback/1.json').read_bytes());self.assertEqual(m['server_hash'],'current');self.assertEqual(m['chart']['audio_start'],.269);self.assertEqual(m['chart']['notes'][0][0],1);self.assertEqual(m['chart']['notes'][0][5][-1],[2.5,96]);self.assertEqual(hashlib.sha256((out/'playback'/m['audio']['file']).read_bytes()).hexdigest(),m['audio']['sha256']);self.assertEqual(publish_one(cat,row,root,out),'unchanged')
+   doc['effect']=[{'beat':[0,0,1],'scroll':-100},{'beat':[2,0,1],'scroll':0},{'beat':[4,0,1],'scroll':1}]
+   (song/'a.mc').write_text(json.dumps(doc));self.assertEqual(publish_one(cat,row,root,out),'published')
+   m=json.loads((out/'playback/1.json').read_bytes());self.assertEqual(m['chart']['scroll'],[[0,-100],[1,0],[2,1]])
+   self.assertEqual(m['chart']['notes'][0][0],1)
    doc['time'][1]['delay']=1;(song/'a.mc').write_text(json.dumps(doc));self.assertEqual(publish_one(cat,row,root,out),'unavailable');self.assertNotIn('chart',json.loads((out/'playback/1.json').read_bytes()))
  def test_path_escape(self):
   with self.assertRaises(ValueError):confined(ROOT,'charts/song','../../../secret')

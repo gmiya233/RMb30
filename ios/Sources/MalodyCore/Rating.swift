@@ -33,8 +33,17 @@ public enum Rating {
         if n >= 99.8 { return 1 }; if n >= 99.5 { return (1 + (n - 99.5) / 30) / 1.01 }
         return pow(n / 99.5, 2) / 1.01
     }
+    public static func wholeAccuracy(chart: Chart, record: ScoreRecord) -> Double {
+        guard chart.judgementRule == "slide-whole-accuracy-upper-v1", let total = chart.judgementCount,
+              total > 0, total <= 10_000_000 else { return record.accuracy }
+        let counts = (7...10).map { record.rawFields[String($0)] ?? 0 }
+        guard (7...10).contains(where: { record.rawFields[String($0)] != nil }) else { return record.accuracy }
+        guard counts.allSatisfy({ $0.isFinite && $0 >= 0 && $0 <= 10_000_000 && $0 == $0.rounded() }) else { return .nan }
+        let upper = 100 * (counts[0] + counts[1] + counts[2]) / Double(total)
+        return min(record.accuracy, max(0, min(100, upper)))
+    }
     public static func score(chart: Chart, record: ScoreRecord) -> Double? {
-        guard let level = chart.level, let factor = accuracyFactor(record.accuracy), (1...5).contains(record.judge) else { return nil }
+        guard let level = chart.level, let factor = accuracyFactor(wholeAccuracy(chart: chart, record: record)), (1...5).contains(record.judge) else { return nil }
         return level * factor * multipliers[record.judge]
     }
     public static func judgeName(_ judge: Int) -> String { (1...5).contains(judge) ? "\(Array("ABCDE")[judge - 1])判" : "判定待核对" }
@@ -49,7 +58,7 @@ public struct RatedScore: Identifiable {
     public var judgeOverride: Int? = nil
     public var levelOverride: Double? = nil
     public var simulated = false
-    public var displayedAccuracy: Double { accuracyOverride ?? record.accuracy }
+    public var displayedAccuracy: Double { accuracyOverride ?? Rating.wholeAccuracy(chart: chart, record: record) }
     public var displayedJudge: Int { judgeOverride ?? record.judge }
     public var displayedLevel: String { levelOverride.flatMap { Rating.level(raw: $0, version: "") }.map { "Lv." + Rating.formatLevel($0) } ?? chart.levelLabel }
     public var id: String { record.id }

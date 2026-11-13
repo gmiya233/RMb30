@@ -12,8 +12,14 @@ def level(raw, version):
     try:
         raw = float(raw)
     except (ValueError, TypeError):
-        return None
+        raw = float('nan')
     if not math.isfinite(raw) or raw <= 0:
+        names = re.findall(r'(?<![\d.\-−－])([1-9][0-9]*(?:\.[0-9]+)?)\s*级', version or '')
+        values = {float(value) for value in names}
+        if len(values) == 1:
+            value = values.pop()
+            if 0 < value < 16:
+                return value
         return None
     if raw < 16:
         return raw

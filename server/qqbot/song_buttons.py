@@ -21,6 +21,10 @@ def payload(card, message_id=None):
                 render_data=dict(label=label, visited_label=label, style=1),
                 action=dict(type=2, permission=dict(type=2), data=f'{command} {cid}', enter=True,
                             unsupport_tips='请升级QQ或按谱面ID手动查询。')))
+        buttons.append(dict(id=f'alias-{cid}',
+            render_data=dict(label='添加别名', visited_label='添加别名', style=0),
+            action=dict(type=2, permission=dict(type=2), data=f'歌曲别名 {cid} ', enter=False,
+                        unsupport_tips='请手动输入：歌曲别名 歌曲编号 别名')))
         rows.append(dict(buttons=buttons))
     content = '选择下方按钮，查看这首歌的谱面～'
     if len(charts) > 5:

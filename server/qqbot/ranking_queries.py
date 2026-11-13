@@ -107,6 +107,10 @@ class Queries:
             self._catalogue = doc['server'], charts
             self._signature = signature
             self._theoretical = None
+        if getattr(self, 'alias_store', None) is not None:
+            aliases = self.alias_store.all()
+            server, charts = self._catalogue
+            return server, {cid: dict(row, aliases=aliases.get(self.alias_store.key(row), [])) for cid,row in charts.items()}
         return self._catalogue
 
     def rating_help(self):
@@ -195,7 +199,7 @@ class Queries:
         if not terms:
             return []
         _, charts = self.catalogue()
-        matches = [row for row in charts.values() if row.get('search_visible', True) is True and all(term in normalize(' '.join(str(row.get(k, '')) for k in ('title', 'artist', 'creator', 'version', 'cid'))) for term in terms)]
+        matches = [row for row in charts.values() if row.get('search_visible', True) is True and all(term in normalize(' '.join(str(row.get(k, '')) for k in ('title', 'artist', 'creator', 'version', 'cid', 'aliases', 'search_names'))) for term in terms)]
         return sorted(matches, key=lambda row: (normalize(row.get('title', '')) != normalize(query), normalize(row.get('title', '')), row['cid']))
 
     def search_reply(self, query):
@@ -225,6 +229,21 @@ class Queries:
         parts = content.split(maxsplit=1)
         command, arg = (parts + [''])[:2] if parts else ('', '')
         try:
+            if command == '歌曲别名':
+                values = arg.split(maxsplit=1)
+                if len(values) != 2 or not values[0].isascii() or not values[0].isdigit():
+                    return '用法：歌曲别名 歌曲编号 别名（可用歌曲信息中的谱面ID）'
+                if getattr(self, 'alias_store', None) is None:
+                    return '歌曲别名功能暂时不可用，请稍后重试。'
+                charts = self.catalogue()[1]
+                cid = int(values[0])
+                chart = charts.get(cid)
+                if chart is None:
+                    chart = next((r for r in charts.values() if r.get('sid') == cid and r.get('search_visible', True) is True), None)
+                if chart is None or chart.get('search_visible', True) is not True:
+                    return '歌曲编号不在可查询曲库中，请先查歌确认编号。'
+                added = self.alias_store.add(chart, values[1])
+                return ('已添加歌曲别名：' if added else '这个别名已经记录：') + text(values[1],48) + '\n歌曲：' + text(chart.get('title','未命名')) + '\n同歌所有难度共享别名，现在可用这个别名查歌。'
             if command in GUIDE_COMMANDS:
                 return GUIDE
             if command in ('', '帮助', 'help', '菜单'):

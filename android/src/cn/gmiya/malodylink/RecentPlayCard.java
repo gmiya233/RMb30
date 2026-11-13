@@ -21,7 +21,7 @@ public final class RecentPlayCard extends LinearLayout {
         TextView badge=AppUi.text(c,level,13,CYAN,true);info.addView(badge);addView(top);AppUi.space(this,8);
         addView(ChartKeyBadge.view(c,play.chart,24));AppUi.space(this,4);
         TextView score=AppUi.text(c,String.format(Locale.ROOT,"%,d",play.record.optLong("score_candidate")),26,NAVY,true);score.setMaxLines(1);score.setAutoSizeTextTypeUniformWithConfiguration(16,26,1,android.util.TypedValue.COMPLEX_UNIT_SP);addView(score);
-        addView(AppUi.text(c,RatingRules.judgeName(play.judge)+"  ·  准度 "+String.format(Locale.ROOT,"%.3f%%",play.record.optDouble("accuracy_candidate")),13,MUTED,false));
+        addView(AppUi.text(c,RatingRules.judgeName(play.judge)+"  ·  准度 "+String.format(Locale.ROOT,"%.3f%%",AccuracyRules.whole(play.record,play.chart)),13,MUTED,false));
         addView(AppUi.text(c,"rating  "+(Double.isFinite(play.rating)?String.format(Locale.ROOT,"%.4f",play.rating):"待定"),18,CYAN,true));
         String time=play.record.optLong("played_at")>0?new SimpleDateFormat("MM-dd HH:mm",Locale.CHINA).format(new Date(play.record.optLong("played_at")*1000)):"时间未知";
         AppUi.space(this,6);addView(AppUi.text(c,String.format(Locale.ROOT,"%02d",position)+"  ·  "+time+"  ·  试算",12,MUTED,false));

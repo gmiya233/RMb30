@@ -21,7 +21,7 @@ public final class PlayerTitle {
         if(!key.matches("(?:sid|cid):[1-9][0-9]{0,9}"))return fallback;
         Map<String,JSONObject> active=new HashMap<>();for(int i=0;i<charts.length();i++){JSONObject c=charts.optJSONObject(i);if(c!=null)active.put(c.optInt("cid")+":"+c.optString("server_hash"),c);}
         for(int i=0;i<records.length();i++){JSONObject s=records.optJSONObject(i);if(s==null||s.optBoolean("demo")||s.optBoolean("manual"))continue;double a=s.optDouble("accuracy_candidate");if(!Double.isFinite(a)||a<=99.8||a>100)continue;
-            JSONObject c=active.get(s.optInt("cid")+":"+s.optString("server_hash"));if(c==null)continue;String id=c.optInt("sid")>0?"sid:"+c.optInt("sid"):"cid:"+c.optInt("cid");String title=c.optString("title").trim();if(key.equals(id)&&!title.isEmpty()&&title.length()<=128)return title;
+            JSONObject c=active.get(s.optInt("cid")+":"+s.optString("server_hash"));if(c==null||AccuracyRules.whole(s,c)<=99.8)continue;String id=c.optInt("sid")>0?"sid:"+c.optInt("sid"):"cid:"+c.optInt("cid");String title=c.optString("title").trim();if(key.equals(id)&&!title.isEmpty()&&title.length()<=128)return title;
         }return fallback;
     }
 }

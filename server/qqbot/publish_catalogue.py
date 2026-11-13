@@ -19,7 +19,7 @@ def creator_filter():
 
 def public_catalogue(doc):
     visible = creator_filter()
-    fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote', 'server_hash')
+    fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote', 'server_hash', 'search_names', 'judgement_count', 'judgement_rule', 'keys', 'radar')
     return {'server': doc['server'], 'charts': [
         {k: row[k] for k in fields if k in row} | {'search_visible': visible(str(row.get('creator') or '')) or (row.get('cid') == 604386 and str(row.get('title', '')).casefold().strip() == 'we luv lama' and 'imddesigner' not in str(row.get('creator', '')).casefold()), 'artworks': artwork_candidates(row)}
         for row in doc['charts']]}
@@ -43,6 +43,8 @@ def publish_b30(catalogue, target):
     revision = status['revision']
     if not re.fullmatch('[a-f0-9]{64}', revision):
         raise ValueError('Invalid revision')
+    from public_rank_access import ensure_public_access
+    ensure_public_access(rankings, revision)
     source = Path('/var/lib/malody-ranking/state') / (revision + '.json')
     totals_file = rankings / revision / 'rt.json'
     if source.is_symlink() or source.stat().st_size > 64 * 1024 * 1024 or totals_file.stat().st_size > 16 * 1024 * 1024:
@@ -86,6 +88,8 @@ def main():
     if chart_source:
         from artwork_fallback import supplement
         supplement(doc['charts'], chart_source, target.parent / 'thumbs', atomic)
+        from radar_catalogue import supplement as radar_supplement
+        radar_supplement(doc['charts'], chart_source, target.parent / 'radar-cache.json', atomic)
     from public_artwork import publish
     publish(doc, target, atomic)
     public = public_catalogue(doc)

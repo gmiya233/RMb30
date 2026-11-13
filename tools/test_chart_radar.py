@@ -1,6 +1,6 @@
 import unittest
 
-from analyze_chart_radar import analyze, peak_density, peak_hold_occupancy, slide_points, slide_point_beats, speed_changes
+from analyze_chart_radar import analyze, peak_density, peak_hold_occupancy, slide_points, slide_point_beats, speed_changes, slide_strength
 from render import Chart, Note
 
 
@@ -22,6 +22,39 @@ class RadarStudyTests(unittest.TestCase):
     def test_continuous_window_and_boundary(self):
         self.assertEqual(peak_density([3.9,4,4.1,7.8])[1], 4)
         self.assertEqual(peak_density([0,4])[1], 1)
+        self.assertEqual(peak_density([]), (0,0,0))
+
+    def test_slide_uses_real_seconds_and_bpm_segments(self):
+        notes=[Note(t,0,61,2,()) for t in (0,4,8,12)]
+        slow=analyze(Chart(notes,[(0,60)],4,0,12,False),{})
+        fast=analyze(Chart(notes,[(0,120)],4,0,12,False),{})
+        changed=analyze(Chart(notes,[(0,60),(4,240)],4,0,12,False),{})
+        self.assertEqual(slow['slide_density'],.5)  # 2 points every 4s, exclusive boundary.
+        self.assertEqual(fast['slide_density'],1)  # 4 points every 4s.
+        self.assertEqual(changed['slide_density'],1.5)  # Events at seconds 4,5,6.
+        self.assertEqual(changed['peak'],2.25)  # 3 heads plus 6 slide points.
+
+    def test_long_gaps_do_not_dilute_slide_peak_and_plain_taps_are_zero(self):
+        notes=[Note(0,0,61,2,()),Note(1,64,61,2,()),Note(100,0,60,0,())]
+        stats=analyze(Chart(notes,[(0,60)],4,0,100,False),{})
+        self.assertEqual(stats['slide_density'],1)
+        self.assertEqual(stats['slide_average'],.04)
+        self.assertEqual(analyze(Chart([Note(0,0,60,0,()),Note(100,0,60,0,())],[(0,60)],4,0,100,False),{})['slide'],0)
+
+    def test_slide_volume_multiplier(self):
+        self.assertEqual(slide_strength(12,0,100),0)
+        self.assertEqual(slide_strength(0,100,100),0)
+        # Doubling volume at unchanged average speed is much stronger than a doubled peak.
+        self.assertAlmostEqual(slide_strength(12,200,200)/slide_strength(12,100,100),2**.7)
+        self.assertAlmostEqual(slide_strength(24,100,100)/slide_strength(12,100,100),2**.1)
+        # Same chart at twice the real tempo has the same volume and twice both densities.
+        self.assertAlmostEqual(slide_strength(24,100,50)/slide_strength(12,100,100),2**.3)
+        # A tiny concentrated burst must not beat a sustained full chart.
+        self.assertLess(slide_strength(25,100,180),slide_strength(10,1800,180))
+        self.assertGreater(slide_strength(20.75,3049,332.958),slide_strength(24,1059,117.02597128378379))
+        for bad in (-1,float('nan'),float('inf')):
+            with self.assertRaises(ValueError):slide_strength(1,bad,100)
+        with self.assertRaises(ValueError):slide_strength(1,100,0)
 
     def test_burst_counts_heads_and_single_flick_points(self):
         chart = Chart([Note(0,0,61,2,()), Note(2,64,60,0,())], [(0,120)], 4, 0, 2, False)

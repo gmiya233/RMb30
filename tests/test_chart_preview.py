@@ -8,7 +8,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'server/chart_preview'), str(ROOT / 'server/qqbot')]
-from render import parse, render, beat
+from render import parse, render, beat, encode_preview
 from publish import publish, source_file
 from chart_preview import ChartPreviews
 
@@ -16,6 +16,18 @@ FONT = next((p for p in [Path('C:/Windows/Fonts/msyh.ttc'), Path('/usr/share/fon
 
 
 class PreviewTests(unittest.TestCase):
+    def test_png_limit_preserves_full_frame(self):
+        from PIL import Image
+        from io import BytesIO
+        import random
+        image = Image.frombytes('RGB', (300,300), random.Random(42).randbytes(300*300*3))
+        data, size = encode_preview(image, limit=150000)
+        self.assertLessEqual(len(data),150000)
+        self.assertEqual(size,(300,300))
+        with Image.open(BytesIO(data)) as decoded:
+            self.assertEqual(decoded.size,image.size)
+            self.assertEqual(decoded.format,'PNG')
+
     def data(self):
         return json.dumps({'meta': {'mode': 7}, 'time': [{'beat': [0, 0, 1], 'bpm': 120}, {'beat': [32, 0, 1], 'bpm': 180}], 'note': [
             {'beat': [0, 0, 1], 'x': 31, 'w': 64},

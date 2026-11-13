@@ -11,8 +11,9 @@ class SongButtonTests(unittest.TestCase):
         b = SongCard(b'other', [dict(cid=99)])
         self.assertIsInstance(a, bytes)
         buttons = payload(a, 'message')['keyboard']['content']['rows'][0]['buttons']
-        self.assertEqual([r['action']['data'] for r in buttons], ['谱面预览 42', '谱面视频 42'])
-        self.assertTrue(all(r['action']['enter'] for r in buttons))
+        self.assertEqual([r['action']['data'] for r in buttons], ['谱面预览 42', '谱面视频 42', '歌曲别名 42 '])
+        self.assertTrue(all(r['action']['enter'] for r in buttons[:2]))
+        self.assertFalse(buttons[2]['action']['enter'])
         self.assertIn('99', payload(b)['keyboard']['content']['rows'][0]['buttons'][0]['action']['data'])
         self.assertNotIn('msg_id', payload(b))
         self.assertIsNone(payload(b'normal-b30'))

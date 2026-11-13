@@ -26,7 +26,7 @@ public final class ChartRadarData {
         if("IMD".equals(format))values[3]=0;
     }
     public static ChartRadarData find(JSONObject doc,String server,JSONObject chart)throws Exception {
-        if(doc.optInt("schema")!=1||!server.equals(doc.optString("server"))||!"per-keys-chart-references-v5".equals(doc.optString("scale")))throw new IOException("六维数据与服务器不匹配");
+        if(doc.optInt("schema")!=1||!server.equals(doc.optString("server"))||!"chart-references-v10-volume-led".equals(doc.optString("scale")))throw new IOException("六维数据与服务器不匹配");
         JSONArray axes=doc.optJSONArray("axes");
         if(axes==null||axes.length()!=6)throw new IOException("六维坐标无效");
         for(int i=0;i<6;i++)if(!AXES[i].equals(axes.optString(i)))throw new IOException("六维坐标顺序不匹配");

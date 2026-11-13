@@ -58,6 +58,8 @@ def main():
     secret = credential.read_text().strip()
     assert secret and str(config['appid']).isdigit()
     queries = Queries(config['rankings'], config['catalogue'])
+    from song_aliases import SongAliases
+    queries.alias_store = SongAliases(Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'song-aliases.sqlite3')
     b30 = B30Commands(queries, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'bindings.sqlite3',
                       config.get('b30', '/var/lib/malody-qqbot/catalog-source/b30'),
                       config.get('font', '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'),
@@ -73,6 +75,10 @@ def main():
     slots = asyncio.Semaphore(8)
     allowed = set(config.get('allowed_groups', []))
     recommendations = Recommendations(queries, b30.font, song_search.roots, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'recommendations.sqlite3')
+    from music_recommendations import MusicRecommendations, COMMANDS as MUSIC_COMMANDS
+    from music_share import install_card_fields, extract_playlist
+    install_card_fields()
+    music_recommendations = MusicRecommendations(Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'music-playlists.sqlite3', b30.bindings, b30.font)
 
     class Client(botpy.Client):
         async def send_card(self, group, image, message_id=None):
@@ -84,10 +90,16 @@ def main():
             if not isinstance(media,dict) or not media.get('file_info'):
                 raise TimeoutError('Image upload acknowledgement missing')
             payload={'msg_type':7, 'content':' ', 'media':{'file_info':media['file_info']}}
+            if hasattr(image,'music'):
+                from ranking_queries import text as clean_text
+                song=image.music
+                payload['content']='小师妹 · 音乐推荐\n'+clean_text(song['title'],100)+' — '+clean_text(song['artist'],100)+'\nhttps://y.qq.com/n/ryqq_v2/songDetail/'+song['mid']
             if message_id: payload.update(msg_id=message_id,msg_seq=1)
             result=await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=payload)
             if not isinstance(result,dict) or not result.get('id'):
                 raise TimeoutError('Image message acknowledgement missing')
+            if hasattr(image,'music'):
+                await asyncio.to_thread(music_recommendations.delivered,group,image.music['mid'])
             async def send_song_actions(data):
                 return await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=data)
             await send_actions(send_song_actions, image, message_id)
@@ -141,7 +153,9 @@ def main():
                         ok=False
                         try:
                             async with slots:
-                                image=await asyncio.wait_for(asyncio.to_thread(recommendations.card,group),timeout=30)
+                                choose_music=await asyncio.to_thread(recommendations.kind,group) == 'music'
+                                maker=music_recommendations.card if choose_music else recommendations.card
+                                image=await asyncio.wait_for(asyncio.to_thread(maker,group),timeout=30)
                                 await self.send_card(group,image)
                                 ok=True
                                 print('Scheduled recommendation: accepted',flush=True)
@@ -168,6 +182,25 @@ def main():
                     return
                 async with slots:
                     command, argument = command_parts(message.content)
+                    music_content=message.content
+                    if command == '绑定歌单':
+                        shared_pid=extract_playlist(getattr(message,'share_data',{}),argument)
+                        if shared_pid:music_content='绑定歌单 '+shared_pid
+                    elif command not in MUSIC_COMMANDS:
+                        pending_music=await asyncio.to_thread(music_recommendations.binding_input,message.group_openid,message.author.member_openid,message)
+                        if pending_music:
+                            music_content=pending_music
+                            command,argument=command_parts(pending_music)
+                    if command in MUSIC_COMMANDS:
+                        try:
+                            music_reply=await asyncio.wait_for(asyncio.to_thread(music_recommendations.execute,message.group_openid,message.author.member_openid,music_content),timeout=30)
+                        except (ValueError,TimeoutError) as error:
+                            music_reply=str(error) or '音乐推荐暂未就绪，请稍后再试。'
+                        if isinstance(music_reply,bytes):
+                            await self.send_card(message.group_openid,music_reply,message.id)
+                        else:
+                            await self.api.post_group_message(group_openid=message.group_openid,msg_type=0,msg_id=message.id,content='\n'+music_reply[:1800])
+                        return
                     if command in RECOMMEND_COMMANDS:
                         group=message.group_openid
                         if command == '关闭推荐':
@@ -196,7 +229,7 @@ def main():
                         from botpy.http import Route
                         async def send_menu_reply(payload):
                             return await self.http.request(Route('POST', '/v2/groups/{group_openid}/messages', group_openid=message.group_openid), json=payload)
-                        await send_menu(send_menu_reply, message.id, queries.HELP)
+                        await send_menu(send_menu_reply, message.id, queries.HELP, page=('传谱菜单' if command_parts(message.content)[0] == '更多功能' else command_parts(message.content)[0]))
                         return
                     if command_parts(message.content)[0] in ('markdown测试', 'md测试'):
                         from botpy.http import Route
@@ -204,10 +237,19 @@ def main():
                             return await self.http.request(Route('POST', '/v2/groups/{group_openid}/messages', group_openid=message.group_openid), json=payload)
                         await probe(send_probe, message.id)
                         return
-                    if command_parts(message.content)[0] in b30.COMMANDS:
+                    if command_parts(message.content)[0] in ('六维算法', '六维规则', '六维参考'):
+                        from radar_rules import explanation
+                        reply = explanation()
+                    elif command_parts(message.content)[0] == '推分推荐':
+                        from push_recommend import PushRecommendations
+                        reply = await asyncio.wait_for(asyncio.to_thread(PushRecommendations(queries, b30).execute, message.group_openid, message.author.member_openid, message.content), timeout=15)
+                    elif command_parts(message.content)[0] in b30.COMMANDS:
                         reply = await asyncio.wait_for(asyncio.to_thread(b30.execute, message.group_openid, message.author.member_openid, message.content), timeout=20)
                     elif command_parts(message.content)[0] in previews.COMMANDS:
                         reply = await asyncio.wait_for(asyncio.to_thread(previews.execute, message.content), timeout=10)
+                    elif command_parts(message.content)[0] in ('等级', '等级表'):
+                        from level_table import LevelTables
+                        reply = await asyncio.wait_for(asyncio.to_thread(LevelTables(queries, b30.font, song_search.roots).execute, message.content), timeout=30)
                     elif command_parts(message.content)[0] == '查歌':
                         reply = await asyncio.wait_for(asyncio.to_thread(song_search.execute, message.content), timeout=10)
                     else:

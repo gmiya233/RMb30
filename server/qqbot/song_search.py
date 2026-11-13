@@ -47,7 +47,7 @@ def section_height(board):
     return 142 + 58 * max(1, len(board['rows']) if board else 0)
 
 
-def render(rows, font_path, roots, boards=None, heading="小师妹 · 歌曲信息"):
+def _render(rows, font_path, roots, boards=None, heading="小师妹 · 歌曲信息"):
     shown = rows[:12]
     boards = boards or {}
     width, height = 1200, 477 + sum(section_height(boards.get(row['cid'])) for row in shown)
@@ -109,6 +109,11 @@ def render(rows, font_path, roots, boards=None, heading="小师妹 · 歌曲信�
     output = BytesIO()
     image.save(output, format='PNG', optimize=True)
     return output.getvalue()
+
+
+def render(rows, font_path, roots, boards=None, heading='小师妹 · 歌曲信息'):
+    from song_aliases import append_aliases
+    return append_aliases(_render(rows, font_path, roots, boards, heading), rows, font_path)
 
 
 class SongSearch:

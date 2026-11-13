@@ -21,7 +21,7 @@ from render import Timeline, beat, parse
 from imd import parse_imd
 from b30_data import level
 
-VERSION = 'study-6-peak-eight-second-hold-occupancy'
+VERSION = 'study-9-slide-volume-led-real-time'
 AXES = [
     ('notes', '物量', '个'), ('chord', '多押', '组'),
     ('peak', '爆发', '点/s'), ('hold', '长条', '平均条'),
@@ -68,9 +68,19 @@ def slide_points(note):
     return len(slide_point_beats(note))
 
 
+def slide_strength(density, points, duration):
+    """Volume-led geometric score: 70% total, 20% real average, 10% peak."""
+    if (not math.isfinite(density) or density < 0 or not math.isfinite(points) or points < 0
+            or not math.isfinite(duration) or duration <= 0):
+        raise ValueError('Invalid slide measurement')
+    return points ** .7 * (points / duration) ** .2 * density ** .1
+
+
 def peak_density(times, seconds=4.0):
     """Maximum event count in a half-open continuous [start,start+window)."""
     times = sorted(times)
+    if not times:
+        return 0.0, 0, 0.0
     end = best = 0
     best_start = times[0]
     for start in range(len(times)):
@@ -166,6 +176,7 @@ def analyze(chart, document):
                       and not n.direction and not n.tail_direction]
     holds, hold_start = peak_hold_occupancy(hold_intervals, clock.seconds(first), clock.seconds(last))
     points = len(slide_times)
+    slide_peak, slide_count, slide_start = peak_density(slide_times)
     head_peak, _, _ = peak_density(times)
     peak, peak_count, peak_start = peak_density(times + slide_times)
     in_window = lambda at: peak_start <= at and at - peak_start < 4 - 1e-9
@@ -177,7 +188,12 @@ def analyze(chart, document):
         speed, channels, unknown = speed_changes(chart, document, first, last)
     return {
         'notes': len(chart.notes), 'chord': sizes[3] + sizes[4],
-        'peak': peak, 'hold': holds, 'slide': points / duration,
+        'peak': peak, 'hold': holds, 'slide': slide_strength(slide_peak, points, duration),
+        'slide_density': slide_peak,
+        'slide_average': points / duration,
+        'slide_peak_count': slide_count,
+        'slide_peak_start_s': slide_start-clock.seconds(first) if slide_times else 0.0,
+        'slide_peak_end_s': slide_start-clock.seconds(first)+4 if slide_times else 4.0,
         'hold_count': len(hold_intervals),
         'hold_peak_start_s': hold_start - clock.seconds(first),
         'hold_peak_end_s': hold_start - clock.seconds(first) + 8,

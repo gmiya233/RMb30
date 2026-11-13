@@ -3,7 +3,7 @@ import hashlib,json,os,shutil
 from pathlib import Path,PurePosixPath
 from render import parse,Timeline,MAX_BYTES
 from imd import parse_imd
-REVISION='autoplay-2-scroll'
+REVISION='autoplay-3-signed-scroll'
 def atomic(path,data):
  path.parent.mkdir(parents=True,exist_ok=True)
  stage=path.with_suffix(path.suffix+'.tmp')
@@ -49,7 +49,7 @@ def publish_one(catalogue,row,root,output):
     if 'hs' in e or 'scroll' in e:events.setdefault(clock.seconds(beat(e['beat'])),{}).update({k:e[k] for k in ['hs','scroll'] if k in e})
    for t,e in sorted(events.items()):
     hs=e.get('hs',hs);scroll=e.get('scroll',scroll);v=hs*scroll
-    if not 0<=v<=32:raise ValueError('Unsupported reverse or extreme scroll')
+    if not isinstance(v,(int,float)) or not __import__('math').isfinite(v) or abs(v)>10000:raise ValueError('Invalid or extreme scroll')
     scrolls.append([t,v])
   normalized['scroll']=scrolls
   normalized['effects']=not original and any(not any(k in e for k in ['hs','scroll']) for e in d.get('effect',[]))

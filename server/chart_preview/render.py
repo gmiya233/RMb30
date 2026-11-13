@@ -15,7 +15,7 @@ import re
 
 from PIL import Image, ImageDraw, ImageFont
 
-VERSION = 'rmvi-static-7-rectangular-heads'
+VERSION = 'rmvi-static-8-size-safe-png'
 SKIN = Path(__file__).parent / 'skin'
 MAX_BYTES = 16 * 1024 * 1024
 
@@ -367,8 +367,27 @@ def render(chart, metadata, font_path, page=1):
         note += ' · 微小分段倒序按原时间排列'
     label(24, height - 58, note, 17, '#afc5d2', width - 48)
     label(24, height - 30, '皮肤：dreamcat / Acc@9961 / Sam_0324  ·  Malody Link', 15, '#8aa7b8', width - 48)
-    output = BytesIO(); image.save(output, format='PNG', optimize=True)
-    data = output.getvalue()
-    if len(data) > 4 * 1024 * 1024:
-        raise ValueError('Preview exceeds image upload limit')
-    return data, image.size
+    return encode_preview(image)
+
+
+def encode_preview(image, limit=4 * 1024 * 1024):
+    """Keep the entire chart in one PNG; prefer full resolution over RGB depth."""
+    def encode(value):
+        output = BytesIO(); value.save(output, format='PNG', optimize=True)
+        return output.getvalue()
+    data = encode(image)
+    if len(data) <= limit:
+        return data, image.size
+    for colors in (256, 128):
+        palette = image.convert('RGB').quantize(colors=colors, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+        data = encode(palette)
+        if len(data) <= limit:
+            return data, image.size
+    # Exceptional long charts still stay complete: resize the whole image, never crop.
+    scaled = image.convert('RGB')
+    while min(scaled.size) > 256:
+        scaled = scaled.resize((max(1,int(scaled.width*.85)),max(1,int(scaled.height*.85))), Image.Resampling.LANCZOS)
+        data = encode(scaled.quantize(colors=128, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE))
+        if len(data) <= limit:
+            return data, scaled.size
+    raise ValueError('Preview exceeds image upload limit after compression')

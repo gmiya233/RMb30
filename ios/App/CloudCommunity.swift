@@ -128,6 +128,7 @@ extension Catalogue {
         let enriched = charts.map { c -> Chart in
             var chart = c
             if let row = metadata[c.cid], row["server_hash"] as? String == c.serverHash, let n = row["keys"] as? Int, (0...64).contains(n) {
+                chart.judgementCount = row["judgement_count"] as? Int; chart.judgementRule = row["judgement_rule"] as? String ?? ""
                 chart.declaredKeys = n; chart.keysSource = row["keys_source"] as? String ?? ""
             }; return chart
         }

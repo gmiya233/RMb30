@@ -57,7 +57,7 @@ public struct RatingPreview: Codable {
     public func value(chart: Chart, record: ScoreRecord) -> Double? {
         let j = judge == 0 ? (judges[chart.cid] ?? record.judge) : judge
         guard multipliers.count == 6, (1...5).contains(j), multipliers[j].isFinite, multipliers[j] > 0, multipliers[j] <= 10,
-              let factor = Rating.accuracyFactor(accuracies[chart.cid] ?? record.accuracy), let level = levels[chart.cid].flatMap({ Rating.level(raw: $0, version: "") }) ?? chart.level else { return nil }
+              let factor = Rating.accuracyFactor(accuracies[chart.cid] ?? Rating.wholeAccuracy(chart: chart, record: record)), let level = levels[chart.cid].flatMap({ Rating.level(raw: $0, version: "") }) ?? chart.level else { return nil }
         return level * factor * multipliers[j]
     }
 }

@@ -12,7 +12,7 @@ public enum PlayerTitle {
         let charts = catalogue.byCID
         var songs: [String: String] = [:]
         for record in catalogue.filtered(records) where record.accuracy > 99.8 {
-            if let chart = charts[record.cid], !chart.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, chart.title.utf16.count <= 128 {
+            if let chart = charts[record.cid], Rating.wholeAccuracy(chart: chart, record: record) > 99.8, !chart.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, chart.title.utf16.count <= 128 {
                 songs[chart.identity] = chart.title
             }
         }
