@@ -20,8 +20,8 @@ public final class RankingIndex {
         List<JSONObject> sorted=new ArrayList<>();for(int i=0;i<charts.length();i++)sorted.add(charts.getJSONObject(i));sorted.sort((a,b)->Integer.compare(a.optInt("cid"),b.optInt("cid")));
         // Android and desktop org.json escape forward slashes differently. The namespace
         // must use a platform-independent encoding, rather than JSON serializer output.
-        StringBuilder key=new StringBuilder("index-v2-zero-based-judge:");part(key,server);
-        for(JSONObject c:sorted){part(key,Integer.toString(c.optInt("cid")));part(key,Integer.toString(c.optInt("sid")));part(key,c.optString("server_hash"));part(key,c.optString("version"));double level=c.optDouble("level");part(key,Double.isFinite(level)?java.math.BigDecimal.valueOf(level).stripTrailingZeros().toPlainString():"?");part(key,(c.optBoolean("promote")||c.optInt("promote")==1)?"1":"0");part(key,c.optString("path"));}
+        StringBuilder key=new StringBuilder("index-v4-whole-accuracy:");part(key,server);
+        for(JSONObject c:sorted){part(key,Integer.toString(c.optInt("cid")));part(key,Integer.toString(c.optInt("sid")));part(key,c.optString("server_hash"));part(key,c.optString("version"));double level=c.optDouble("level");part(key,Double.isFinite(level)?java.math.BigDecimal.valueOf(level).stripTrailingZeros().toPlainString():"?");part(key,(c.optBoolean("promote")||c.optInt("promote")==1)?"1":"0");part(key,c.optString("path"));part(key,c.optString("judgement_rule"));part(key,Long.toString(c.optLong("judgement_count")));}
         return CloudRecords.sha256(key.toString().getBytes(StandardCharsets.UTF_8));
     }
     private static void part(StringBuilder key,String value){key.append(value.length()).append(':').append(value);}

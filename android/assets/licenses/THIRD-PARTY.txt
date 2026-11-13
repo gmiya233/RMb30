@@ -16,3 +16,7 @@ Bouncy Castle bcprov-jdk15to18 1.81, Bouncy Castle licence (MIT style).
 Source: https://github.com/bcgit/bc-java/tree/r1rv81
 
 Full licence texts are included alongside this file. Existing Shizuku optional compatibility API 13.1.5 is Apache-2.0.
+
+Radar font pairing B: Noto Sans SC and Rajdhani. SIL Open Font License 1.1.
+Source: https://github.com/google/fonts/tree/main/ofl/notosanssc and /rajdhani.
+License texts: NotoSansSC-OFL.txt, Rajdhani-OFL.txt. Fonts are bundled unmodified.

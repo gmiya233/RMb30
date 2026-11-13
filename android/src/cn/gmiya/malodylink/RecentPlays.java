@@ -15,7 +15,7 @@ public final class RecentPlays {
             if(c==null||!c.optString("server_hash").equals(s.optString("server_hash")))continue;
             Play p=new Play();p.record=s;p.chart=c;p.judge=CloudRecords.judge(s);
             p.level=ChartDetails.level(SongCatalogue.rawLevel(c),c.optString("version"));
-            try{p.rating=rules.rating(SongCatalogue.rawLevel(c),c.optString("version"),s.optDouble("accuracy_candidate"),p.judge);}catch(IllegalArgumentException invalid){p.rating=Double.NaN;}
+            try{p.rating=rules.rating(SongCatalogue.rawLevel(c),c.optString("version"),AccuracyRules.whole(s,c),p.judge);}catch(IllegalArgumentException invalid){p.rating=Double.NaN;}
             rows.add(p);
         }
         rows.sort((a,b)->{int order=Long.compare(b.record.optLong("played_at"),a.record.optLong("played_at"));return order!=0?order:a.record.optString("id").compareTo(b.record.optString("id"));});

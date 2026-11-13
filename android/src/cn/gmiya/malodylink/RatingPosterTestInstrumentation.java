@@ -29,7 +29,7 @@ public final class RatingPosterTestInstrumentation extends Instrumentation {
         test.getSharedPreferences("poster",0).edit().putString("entry_900001",new JSONObject().put("level",15).put("accuracy",100).put("judge",5).toString()).commit();
         check(Math.abs(LocalPlayerProfile.actualRating(test,engine)-28.0/30)<1e-9&&LocalPlayerProfile.DEFAULT_TITLE.equals(LocalPlayerProfile.title(test,engine)),"preview changes cannot unlock rating titles");
         test.getSharedPreferences("poster",0).edit().remove("entry_900001").commit();
-        PosterData.Board judge=PosterData.load(test,engine,false,new RatingRules(),1);check(judge.old.get(0).displayLevel()==13&&Math.abs(judge.old.get(0).converted-13*.78)<1e-9,"judge-only preview keeps SC conversion");
+        PosterData.Board judge=PosterData.load(test,engine,false,new RatingRules(),1);check(judge.old.get(0).displayLevel()==13&&Math.abs(judge.old.get(0).converted-13*.97/1.01)<1e-9,"judge-only preview keeps SC conversion");
         Bitmap bitmap=new ScorePoster(test).render(b);check(bitmap.getWidth()==1500&&bitmap.getHeight()==1664,"poster dimensions");
         try(FileOutputStream out=new FileOutputStream(new File(base.getCacheDir(),"rating-sc-fixture.png"))){check(bitmap.compress(Bitmap.CompressFormat.PNG,100,out),"fixture PNG rendered");}bitmap.recycle();
         check(Arrays.equals(original,ScoreStore.exists(originalFile)?ScoreStore.read(originalFile):null),"original player scores preserved");

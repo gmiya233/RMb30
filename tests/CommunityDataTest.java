@@ -21,6 +21,14 @@ public final class CommunityDataTest {
         song.getJSONArray("reviews").put(song.getJSONArray("reviews").get(0));try{CommunityData.song(bytes(song),server,revision,"s1");throw new AssertionError("duplicate votes accepted");}catch(java.io.IOException expected){}
         JSONObject rows=new JSONObject();for(String id:CommunityData.IDS)rows.put(id,new JSONArray());JSONObject boards=new JSONObject().put("schema",1).put("server",server).put("revision",revision).put("updated",System.currentTimeMillis()).put("boards",rows);
         check(CommunityData.boards(bytes(boards),server,revision).rows("song_good").length()==0,"unrated board is empty");
+        String newer=String.join("",java.util.Collections.nCopies(64,"b"));int[] refreshes={0};
+        JSONObject removedMapper=new JSONObject(boards.toString()).put("revision",newer);
+        CommunityData.Boards refreshed=CommunityData.boardsWithRefresh(bytes(removedMapper),server,revision,()->{refreshes[0]++;return newer;});
+        check(refreshes[0]==1&&refreshed.doc.getString("revision").equals(newer)&&refreshed.rows("creator_hot").length()==0,"new catalogue revision replaces the old mapper board after one catalogue refresh");
+        CommunityData.boardsWithRefresh(bytes(boards),server,revision,()->{throw new AssertionError("unchanged catalogue refreshed");});
+        try{CommunityData.boardsWithRefresh(bytes(removedMapper),server,revision,()->revision);throw new AssertionError("unresolved revision mismatch accepted");}catch(java.io.IOException expected){}
+        try{CommunityData.boardsWithRefresh(bytes(removedMapper),"another-server",revision,()->{throw new AssertionError("cross-server response triggered catalogue refresh");});throw new AssertionError("wrong server accepted");}catch(java.io.IOException expected){}
+
         rows.getJSONArray("song_hot").put(new JSONObject().put("id","s1").put("cid",1).put("name","Fixture").put("rank",1).put("downloads",42).put("average",4).put("rating_count",2));
         check(CommunityData.boards(bytes(boards),server,revision).rows("song_hot").length()==1,"bounded board accepted");
         JSONObject creator=new JSONObject().put("id",revision).put("name","Mapper").put("rank",1).put("downloads",42).put("average",0).put("rating_count",0);
