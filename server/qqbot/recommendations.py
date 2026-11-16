@@ -73,7 +73,9 @@ class Recommendations:
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('INSERT OR IGNORE INTO recommendations(group_id) VALUES (?)',(group,))
             db.execute('UPDATE recommendations SET history=? WHERE group_id=?',(json.dumps((history+[json.dumps(selected)])[-20:]),group))
-        return SongCard(image, rows)
+        card=SongCard(image,rows)
+        card.preview_charts=tuple((row['cid'],row.get('server_hash','')) for row in rows)
+        return card
 
     def enable(self,group):
         now=self.clock();due=next_push_time(now if self.quiet() else now+INTERVAL)

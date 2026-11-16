@@ -1,8 +1,7 @@
 """Extract official playlist URLs from received cards, never download arbitrary URLs."""
 import json,re,html
 
-def extract_playlist(*parts):
-    from music_recommendations import playlist_id
+def _extract(parser,*parts):
     ids=set()
     def visit(value,depth=0):
         if depth>8:return
@@ -11,15 +10,25 @@ def extract_playlist(*parts):
         elif isinstance(value,list):
             for child in value[:100]:visit(child,depth+1)
         elif isinstance(value,str) and len(value)<=32768:
-            clean=html.unescape(value.replace('\\/','/'))
+            clean=html.unescape(value.replace('\\/','/').replace('\\:',':').replace('\\_','_').replace('\\&','&'))
             for url in re.findall(r'https://[^\s<>"\x27]+',clean):
-                try:ids.add(playlist_id(url.rstrip('，。)）]')))
+                try:ids.add(parser(url.rstrip('，。)）]')))
                 except ValueError:pass
             if value.lstrip().startswith(('{','[')):
                 try:visit(json.loads(value),depth+1)
                 except ValueError:pass
     for part in parts:visit(part)
     return next(iter(ids)) if len(ids)==1 else None
+
+
+def extract_playlist(*parts):
+    from music_recommendations import playlist_id
+    return _extract(playlist_id,*parts)
+
+
+def extract_album(*parts):
+    from music_album import album_share_reference
+    return _extract(album_share_reference,*parts)
 
 def install_card_fields():
     # The pinned botpy SDK discards newer card fields. Retain only share-related data

@@ -9,7 +9,7 @@ class MenuTests(unittest.TestCase):
  def buttons(self,page='菜单'):
   return [b for r in payload('fixture',page=page)['keyboard']['content']['rows'] for b in r['buttons']]
  def test_readable_category_layout_and_complete_reachable_commands(self):
-  self.assertEqual(len(self.buttons()),7)
+  self.assertEqual(len(self.buttons()),8)
   found=set();visited=set();pending=['菜单']
   while pending:
    page=pending.pop()
@@ -25,10 +25,12 @@ class MenuTests(unittest.TestCase):
   self.assertEqual(visited,set(PAGES))
   self.assertTrue({'b30','6kb30','rating','推分推荐','等级','歌曲别名','查歌','谱面预览','谱面视频','总榜','6k榜','活跃榜','单曲榜','查排名','歌曲推荐','推荐状态','开启推荐','关闭推荐','绑定','我的绑定','解绑','新手教程','传谱','确认传谱','取消传谱','传谱状态','传谱认证','传谱权限','撤销传谱权限','传谱权限列表'}<=found)
  def test_input_commands_do_not_send_incomplete_parameters(self):
-  needs={'查歌','等级','歌曲别名','谱面预览','谱面视频','单曲榜','查排名','绑定','绑定歌单','传谱','确认传谱','取消传谱','传谱状态','传谱权限','撤销传谱权限'}
+  needs={'查歌','等级','歌曲别名','谱面预览','谱面视频','单曲榜','查排名','绑定','绑定歌单','移除专辑','传谱','确认传谱','取消传谱','传谱状态','传谱权限','撤销传谱权限'}
   for page in PAGES:
    for b in self.buttons(page):
-    self.assertEqual(b['action']['enter'],command_parts(b['action']['data'])[0] not in needs)
+    command=command_parts(b['action']['data'])[0]
+    if command=='绑定歌单':self.assertEqual(b['action']['enter'],page=='歌单菜单')
+    else:self.assertEqual(b['action']['enter'],command not in needs)
   self.assertIn('排行榜菜单',COMMANDS)
   self.assertIn('更多功能',COMMANDS)
  def test_delivery_and_category_specific_fallback(self):

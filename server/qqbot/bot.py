@@ -76,9 +76,14 @@ def main():
     allowed = set(config.get('allowed_groups', []))
     recommendations = Recommendations(queries, b30.font, song_search.roots, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'recommendations.sqlite3')
     from music_recommendations import MusicRecommendations, COMMANDS as MUSIC_COMMANDS
-    from music_share import install_card_fields, extract_playlist
+    from music_share import install_card_fields, extract_playlist, extract_album
     install_card_fields()
     music_recommendations = MusicRecommendations(Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'music-playlists.sqlite3', b30.bindings, b30.font)
+    from music_preview import MusicPreview
+    music_voice = MusicPreview(Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'music-preview-tmp')
+    from chart_audio import ChartAudio
+    chart_voice = ChartAudio(Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'chart-audio-tmp',queries,previews.root / 'playback')
+    chart_voice.slot = music_voice.slot
 
     class Client(botpy.Client):
         async def send_card(self, group, image, message_id=None):
@@ -103,6 +108,15 @@ def main():
             async def send_song_actions(data):
                 return await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=data)
             await send_actions(send_song_actions, image, message_id)
+            if hasattr(image,'music'):
+                async def audio_request(endpoint,data):
+                    return await self.http.request(Route('POST','/v2/groups/{group_openid}/'+endpoint,group_openid=group),json=data)
+                await music_voice.send(audio_request,image.music,message_id,allowed=lambda:bool(message_id) or not recommendations.quiet())
+            elif getattr(image,'preview_charts',None):
+                async def chart_audio_request(endpoint,data):
+                    return await self.http.request(Route('POST','/v2/groups/{group_openid}/'+endpoint,group_openid=group),json=data)
+                await chart_voice.send(chart_audio_request,image.preview_charts,message_id,allowed=lambda:bool(message_id) or not recommendations.quiet(),sequence=3)
+            return True
 
         async def video_reply(self,message):
             from botpy.http import Route
@@ -186,6 +200,9 @@ def main():
                     if command == '绑定歌单':
                         shared_pid=extract_playlist(getattr(message,'share_data',{}),argument)
                         if shared_pid:music_content='绑定歌单 '+shared_pid
+                    elif command == '添加专辑':
+                        shared_aid=extract_album(getattr(message,'share_data',{}),argument)
+                        if shared_aid:music_content='添加专辑 '+shared_aid
                     elif command not in MUSIC_COMMANDS:
                         pending_music=await asyncio.to_thread(music_recommendations.binding_input,message.group_openid,message.author.member_openid,message)
                         if pending_music:
