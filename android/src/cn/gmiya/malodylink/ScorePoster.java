@@ -12,15 +12,16 @@ public final class ScorePoster {
     private static final int NAVY=0xff14334f,CYAN=0xff08acbf,PINK=0xffb742aa;
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
     private final Map<Integer,Bitmap> jackets=new HashMap<>();
-    private final Context context;
+    private final Context context;private final Map<Integer,String> chartHashes=new HashMap<>();
     private Canvas c;
-    public ScorePoster(Context context){this.context=context;}
+    public ScorePoster(Context context){this.context=context;try{org.json.JSONArray charts=new Engine(context).charts();for(int i=0;i<charts.length();i++){org.json.JSONObject chart=charts.getJSONObject(i);chartHashes.put(chart.getInt("cid"),chart.optString("server_hash"));}}catch(Exception ignored){}}
     private void rect(float x,float y,float w,float h,int color,float radius){p.setShader(null);p.setStyle(Paint.Style.FILL);p.setColor(color);c.drawRoundRect(x,y,x+w,y+h,radius,radius,p);}
     private void text(String text,float x,float y,float size,int color,boolean bold){p.setShader(null);p.setStyle(Paint.Style.FILL);p.setColor(color);p.setTextSize(size);p.setTypeface(bold?Typeface.create("sans-serif",Typeface.BOLD):Typeface.create("sans-serif",Typeface.NORMAL));c.drawText(text,x,y,p);}
     private String fit(String text,float size,float width){p.setTextSize(size);p.setTypeface(Typeface.create("sans-serif",Typeface.BOLD));if(p.measureText(text)<=width)return text;int end=text.length();while(end>0&&p.measureText(text.substring(0,end)+"…")>width)end--;if(end>0&&Character.isHighSurrogate(text.charAt(end-1)))end--;return text.substring(0,end)+"…";}
     private void polygon(float[] xy,int color){p.setShader(null);p.setColor(color);p.setStyle(Paint.Style.FILL);Path path=new Path();path.moveTo(xy[0],xy[1]);for(int i=2;i<xy.length;i+=2)path.lineTo(xy[i],xy[i+1]);path.close();c.drawPath(path,p);}
     private Bitmap jacket(int cid){if(jackets.containsKey(cid))return jackets.get(cid);Bitmap bitmap=null;
-        try{File file=new File(context.getFilesDir(),"jackets/"+cid+".img");InputStream in=file.exists()?new FileInputStream(file):context.getAssets().open("jackets/"+cid+".img");byte[] data=Engine.read(in,8000000);BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,bounds);BitmapFactory.Options o=new BitmapFactory.Options();o.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/256);bitmap=BitmapFactory.decodeByteArray(data,0,data.length,o);}catch(Exception ignored){}
+        try{byte[] data=ServerArtwork.get(context,cid,chartHashes.getOrDefault(cid,""));BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,bounds);BitmapFactory.Options options=new BitmapFactory.Options();options.inSampleSize=Math.max(1,Math.max(bounds.outWidth,bounds.outHeight)/256);bitmap=BitmapFactory.decodeByteArray(data,0,data.length,options);}catch(Exception ignored){}
+
         jackets.put(cid,bitmap);return bitmap;
     }
     private void cover(int cid,float x,float y,float side,int accent){Bitmap b=jacket(cid);if(b==null){rect(x,y,side,side,0xffe3f2f5,8);text("♪",x+side*.25f,y+side*.76f,side*.65f,accent,true);return;}
@@ -45,7 +46,7 @@ public final class ScorePoster {
         text("rating",296,257,25,0xff52758b,false);text(String.format(Locale.ROOT,"%.4f",b.rating()),389,258,34,0xff168c9f,true);
         text("O "+b.old.size()+"/20   N "+b.fresh.size()+"/10",664,256,24,0xff52758b,true);logo();
         rect(1017,192,395,99,0x665b65b4,22);rect(1008,183,395,99,0xffe9dcfa,22);rect(1015,189,381,84,0xf5ffffff,18);
-        text("PLAYER RATING",1075,216,20,0xff8065a6,true);text(String.format(Locale.ROOT,"%.4f",b.rating()),1082,261,47,0xff9f459e,true);
+        text(b.keys==6?"6K RATING":"PLAYER RATING",1075,216,20,0xff8065a6,true);text(String.format(Locale.ROOT,"%.4f",b.rating()),1082,261,47,0xff9f459e,true);
         if(b.demo)text("示例数据",793,64,17,0xffa5267c,true);
     }
     private void section(String group,String subtitle,List<PosterData.Entry> entries,int capacity,float y,int accent){
@@ -77,8 +78,8 @@ public final class ScorePoster {
         for(int i=0;i<12;i++){float x=(i*193)%1500,y=340+(i*233)%1050;c.save();c.rotate(18,x,y);rect(x,y,62,62,0x28ffffff,6);c.restore();}
         header(board);section("O20","日常歌曲 · rating 前 20",board.old,20,307,CYAN);
         section("N10","promote 新歌 · rating 前 10",board.fresh,10,1111,PINK);
-        text("rating = 折算等级 × 准度系数 × 判定倍率   |   99.5% → 100%   ·   99.8%+ → 101%",49,1570,20,NAVY,false);
-        text("低于99.5%取 (准度/99.5)²；99.5%～99.8%线性增长；其后封顶。缺位按0计入30曲均值。",49,1602,18,0xff38536a,false);
+        text("rating = 折算等级 × 准度系数 × 判定倍率   |   99.5% → 99.0099%   ·   99.8%+ → 100%",49,1570,20,NAVY,false);
+        text("ACC原曲线统一除以1.01；99.8%以上封顶为1。缺位按0计入30曲均值。",49,1602,18,0xff38536a,false);
         text("SC1–4→12，SC5–13→13，SC14+→15；其他等级按MaV→RM表 · * 手动预览 · 非官方 MM",49,1633,18,0xff38536a,false);
         if(board.demo){c.save();c.rotate(-16,WIDTH/2f,HEIGHT/2f);text("示例数据 / SAMPLE",220,HEIGHT/2f,92,0x22a62c8d,true);c.restore();}
         for(Bitmap b:jackets.values())if(b!=null)b.recycle();jackets.clear();return bitmap;

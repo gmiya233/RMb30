@@ -10,7 +10,10 @@ import java.io.*;
 
 public final class GallerySaver {
     public static Uri save(Context context,Bitmap bitmap,boolean demo)throws IOException {
-        String name="节奏大师-O20-N10-"+(demo?"示例-":"成绩-")+System.currentTimeMillis()+".png";
+        return save(context,bitmap,"节奏大师-O20-N10-"+(demo?"示例":"成绩"));
+    }
+    public static Uri save(Context context,Bitmap bitmap,String label)throws IOException {
+        String name=label+"-"+System.currentTimeMillis()+".png";
         if(Build.VERSION.SDK_INT>=29){
             ContentResolver resolver=context.getContentResolver();ContentValues values=new ContentValues();
             values.put(MediaStore.Images.Media.DISPLAY_NAME,name);values.put(MediaStore.Images.Media.MIME_TYPE,"image/png");

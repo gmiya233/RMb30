@@ -9,7 +9,7 @@ public final class LocalScoreSync {
     public static final String UPDATED="cn.gmiya.malodylink.LOCAL_SYNC_UPDATED";
     public static volatile String currentProgress="";
     public static boolean isBusy(){return ScoreSyncGate.busy();}
-    private static void connect(Context c,InternalAdb adb,int manualPort)throws Exception {
+    static void connect(Context c,InternalAdb adb,int manualPort)throws Exception {
         if(adb.isConnected())return;
         int port=manualPort;
         if(port==0)try{port=LocalAdbDiscovery.find(c,LocalAdbDiscovery.CONNECT,5000);}

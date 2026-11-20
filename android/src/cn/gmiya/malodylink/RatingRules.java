@@ -2,7 +2,12 @@ package cn.gmiya.malodylink;
 
 /** User-defined converted rating, deliberately separate from Malody official MM. */
 public final class RatingRules {
-    public static final double[] PRESET={Double.NaN,.78,.85,1.00,1.10,1.20};
+    public static final String REVISION="rating-v3-c998-normalized";
+    public static final double[] PRESET={Double.NaN,.97,.985,1.00,1.02,1.04};
+    public static double[] migratePreview(double[] values){
+        if(values.length==6&&values[1]==.78&&values[2]==.85&&values[3]==1&&values[4]==1.10&&values[5]==1.20)return PRESET.clone();
+        return values.clone();
+    }
     public final double[] multipliers;
     public RatingRules(){multipliers=PRESET.clone();}
     public RatingRules(double[] values){
@@ -14,9 +19,9 @@ public final class RatingRules {
     public static int replayJudge(double raw){return Double.isFinite(raw)&&raw>=0&&raw<=4&&raw==Math.rint(raw)?(int)raw+1:0;}
     public static double accuracyFactor(double accuracy){
         if(!Double.isFinite(accuracy)||accuracy<0||accuracy>100)throw new IllegalArgumentException("准度应在 0～100% 之间");
-        if(accuracy>=99.8)return 1.01;
-        if(accuracy>=99.5)return 1.00+(accuracy-99.5)/30.0;
-        return Math.pow(accuracy/99.5,2);
+        if(accuracy>=99.8)return 1.00;
+        if(accuracy>=99.5)return (1.00+(accuracy-99.5)/30.0)/1.01;
+        return Math.pow(accuracy/99.5,2)/1.01;
     }
     public static double normalizedLevel(double raw){
         if(!Double.isFinite(raw)||raw<=0)return Double.NaN;

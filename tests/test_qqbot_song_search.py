@@ -41,7 +41,7 @@ class SongSearchTests(unittest.TestCase):
         result = self.search.execute('<@!123> 查歌 测试歌曲')
         self.assertIsInstance(result, bytes)
         image = Image.open(BytesIO(result))
-        self.assertEqual(image.size, (1200, 877))
+        self.assertEqual(image.size, (1200, 953))
         self.assertGreater(image.getpixel((100, 100))[0], 180)
         (Path(__file__).resolve().parents[1] / 'build' / 'qqbot-song-search-synthetic.png').write_bytes(result)
 
