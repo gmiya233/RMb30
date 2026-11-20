@@ -1,4 +1,4 @@
-"""Opt-in public QQ Music playlists and per-group no-repeat music rotations."""
+"""Opt-in QQ Music sources and per-group no-repeat music rotations."""
 import json,re,time,random,sqlite3,urllib.request,urllib.parse
 import html
 from pathlib import Path
@@ -7,7 +7,8 @@ from io import BytesIO
 from bindings import Bindings
 from PIL import Image,ImageDraw,ImageFont,ImageOps
 from music_album import album_id,fetch_album,resolve_album_input
-COMMANDS={'绑定歌单','我的歌单','解绑歌单','音乐推荐','添加专辑','我的专辑','移除专辑'}
+from music_track import fetch_track, resolve_track_input
+COMMANDS={'绑定歌单','我的歌单','解绑歌单','音乐推荐','添加专辑','我的专辑','移除专辑','添加单曲'}
 
 def playlist_id(value):
  value=html.unescape(value.strip())
@@ -53,16 +54,33 @@ class MusicRecommendations:
    db.execute('CREATE TABLE IF NOT EXISTS playlist_binding_pending (member TEXT PRIMARY KEY, expires REAL)')
    db.execute('CREATE TABLE IF NOT EXISTS albums(owner TEXT,aid TEXT,title TEXT,songs TEXT,updated REAL,PRIMARY KEY(owner,aid))')
    db.execute('CREATE TABLE IF NOT EXISTS album_binding_pending(member TEXT PRIMARY KEY,expires REAL)')
+   db.execute('CREATE TABLE IF NOT EXISTS tracks(owner TEXT,mid TEXT,song TEXT,PRIMARY KEY(owner,mid))')
   self.path.chmod(0o600)
  def execute(self,group,member,content):
   from b30_commands import command_parts
   command,arg=command_parts(content)
-  if not self.bindings.get(group,member):return '请先发送“绑定 你的QQ号”，再绑定QQ音乐歌单或添加专辑。'
+  if not self.bindings.get(group,member):return '请先发送“绑定 你的QQ号”，再使用音乐推荐功能。'
   owner=Bindings.shared_key(member)
   if command=='音乐推荐':
    if arg:return '用法：音乐推荐'
    return self.card(group)
   with closing(sqlite3.connect(self.path)) as db,db:
+   if command=='添加单曲':
+    if not arg:
+     return '在QQ音乐复制歌曲分享文本，发送“@小师妹 添加单曲 分享文本”。也可以直接粘贴歌曲链接。'
+    try:
+     reference=resolve_track_input(arg)
+    except ValueError as error:
+     return str(error)
+    try:
+     song=fetch_track(*reference)
+    except (ValueError,OSError):
+     return '暂时无法读取这首歌，请稍后重试。'
+    result=db.execute('INSERT OR IGNORE INTO tracks(owner,mid,song) VALUES(?,?,?)',
+                      (owner,song['mid'],json.dumps(song,ensure_ascii=False)))
+    if not result.rowcount:
+     return f'你已添加过《{song["title"]}》，它已在公共音乐推荐池中。'
+    return f'已添加《{song["title"]}》，已加入公共音乐推荐池。'
    if command=='添加专辑':
     if not arg:
      db.execute('DELETE FROM playlist_binding_pending WHERE member=?',(Bindings.key(group,member),))
@@ -140,10 +158,12 @@ class MusicRecommendations:
   with closing(sqlite3.connect(self.path)) as db:
    for raw, in db.execute('SELECT songs FROM playlists UNION ALL SELECT songs FROM albums'):
     for song in json.loads(raw):songs.setdefault(song['mid'],song)
+   for mid,raw in db.execute('SELECT mid,song FROM tracks'):
+    if mid not in songs:songs[mid]=json.loads(raw)
   return songs
  def pick(self,group):
   songs=self.pool()
-  if not songs:raise ValueError('暂无音乐推荐池，请已绑定用户发送“绑定歌单 歌单链接”或“添加专辑 专辑链接”加入。')
+  if not songs:raise ValueError('暂无音乐推荐池，绑定QQ后可通过「绑定歌单」「添加专辑」或「添加单曲」加入曲目。')
   with closing(sqlite3.connect(self.path)) as db,db:
    db.execute('BEGIN IMMEDIATE')
    pending=db.execute('SELECT mid FROM music_pending WHERE group_id=?',(group,)).fetchone()
@@ -168,8 +188,7 @@ class MusicRecommendations:
     with urllib.request.urlopen(url,timeout=5) as r:data=r.read(1024*1024)
     with Image.open(BytesIO(data)) as art:image.paste(ImageOps.fit(art.convert('RGB'),(320,320)),(45,65))
    except Exception:pass
-  for y,value,size,color in [(65,'小师妹 · 音乐推荐',30,'#127C83'),(135,song['title'],36,'#18323C'),(245,song['artist'],25,'#52707D'),(335,'来自大家的QQ音乐歌单',22,'#52707D')]:
-   if y==335:value='来自大家的QQ音乐歌单与专辑'
+  for y,value,size,color in [(65,'小师妹 · 音乐推荐',30,'#127C83'),(135,song['title'],36,'#18323C'),(245,song['artist'],25,'#52707D'),(335,'来自大家添加的QQ音乐曲目',22,'#52707D')]:
    font=ImageFont.truetype(str(self.font),size)
    lines=[''];
    for char in value:

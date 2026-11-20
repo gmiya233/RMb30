@@ -32,7 +32,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self,*args):return None
 
 
-def resolve_short(value):
+def resolve_short(value, reference=None):
+    reference = reference or album_id
     for _ in range(3):
         code=short_code(value)
         # c.y.qq.com serves the same official short-link keys, avoiding slow regional c6 routes.
@@ -44,10 +45,10 @@ def resolve_short(value):
             if e.code not in (301,302,303,307,308):raise ValueError('QQ音乐短链暂时无法解析') from e
             target=e.headers.get('Location')
         except (urllib.error.URLError,OSError) as e:
-            raise ValueError('QQ音乐短链暂时无法解析，请稍后重试或复制专辑详情页链接。') from e
-        if not target:raise ValueError('QQ音乐短链未返回专辑地址')
+            raise ValueError('QQ音乐短链暂时无法解析，请稍后重试或复制详情页链接。') from e
+        if not target:raise ValueError('QQ音乐短链未返回详情页地址')
         target=urllib.parse.urljoin(url,share_text(target))
-        try:return album_id(target)
+        try:return reference(target)
         except ValueError:
             short_code(target) # Reject arbitrary hosts before any further request.
             value=target

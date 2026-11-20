@@ -39,11 +39,11 @@ public final class ChartRadarData {
             if(hash.isEmpty()||!hash.equals(chart.optString("server_hash")))throw new IOException("谱面内容已更新，请等待六维数据更新");
             return new ChartRadarData(row,chart,doc.optString("updated"));
         }
-        throw new IOException("这张谱面暂未完成六维分析，目前提供10～15级样本");
+        throw new IOException("这张谱面暂未完成六维分析");
     }
     public static double frameForLevel(double level){
-        if(!Double.isFinite(level)||level<10||level>15)throw new IllegalArgumentException("六维样本等级须为10～15级");
-        return level*10-40;
+        if(!Double.isFinite(level)||level<=0||level>15)throw new IllegalArgumentException("无效的六维样本等级");
+        return level<10?70:level*10-40;
     }
     public boolean hell(int axis){return values[axis]>frame+1e-8;}
     public float radius(int axis,float reveal){return (float)(Math.min(208,values[axis]/frame*116)*Math.max(0,Math.min(1,reveal)));}

@@ -9,16 +9,19 @@ public final class ChartRadarDataTest {
     private static void fails(JSONObject doc,String server,JSONObject c)throws Exception{try{ChartRadarData.find(doc,server,c);throw new AssertionError("invalid metadata accepted");}catch(java.io.IOException expected){}}
     public static void main(String[] args)throws Exception {
         JSONObject doc=new JSONObject(new String(Files.readAllBytes(Paths.get("android/assets/chart-radar.json")),StandardCharsets.UTF_8));String server=doc.getString("server");JSONArray rows=doc.getJSONArray("charts");
-        check(rows.length()>=300,"sample count");int imd=0;
+        check(rows.length()>=300,"sample count");int imd=0,low=0;
+        check(ChartRadarData.frameForLevel(9.9)==70,"sub-level-10 frame");
+        check(ChartRadarData.frameForLevel(10)==60,"level-10 frame");
         for(int i=0;i<rows.length();i++){
             JSONObject row=rows.getJSONObject(i);ChartRadarData data=ChartRadarData.find(doc,server,chart(row));
-            check(data.frame==data.level*10-40,"grade frame");
+            check(data.frame==(data.level<10?70:data.level*10-40),"grade frame");
+            if(data.level<10)low++;
             for(int k=0;k<6;k++){check(data.radius(k,0)==0,"animation starts at center");check(Math.abs(data.radius(k,.5f)*2-data.radius(k,1))<1e-5,"halfway geometry");check(data.radius(k,2)==data.radius(k,1),"animation clamps");}
             if(data.format.equals("IMD")){check(data.values[3]==0&&!data.hell(3),"IMD speed zero");imd++;}
             if(data.cid==604435)check(data.values[0]==100,"Ragnarok notes reference");
             if(data.cid==604332)check(Math.abs(data.values[3]-90)<1e-8,"New Astronomas speed reference is 90");
         }
-        check(imd>0,"IMD coverage");JSONObject c=chart(rows.getJSONObject(0));fails(doc,"another server",c);
+        check(imd>0,"IMD coverage");check(low>0,"low-level asset coverage");JSONObject c=chart(rows.getJSONObject(0));fails(doc,"another server",c);
         JSONObject overflow=new JSONObject(doc.toString());JSONObject overflowRow=overflow.getJSONArray("charts").getJSONObject(0);check(!overflowRow.getString("source_format").equals("IMD"),"overflow fixture uses MC");overflowRow.getJSONArray("values").put(3,1000);
         ChartRadarData overflowData=ChartRadarData.find(overflow,server,c);check(overflowData.values[3]==1000&&overflowData.radius(3,1)==208,"uncapped value with bounded drawing");
         fails(doc,server,new JSONObject(c.toString()).put("server_hash","wrong"));

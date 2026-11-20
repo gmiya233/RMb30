@@ -25,7 +25,7 @@ class MenuTests(unittest.TestCase):
   self.assertEqual(visited,set(PAGES))
   self.assertTrue({'b30','6kb30','rating','推分推荐','等级','歌曲别名','查歌','谱面预览','谱面视频','总榜','6k榜','活跃榜','单曲榜','查排名','歌曲推荐','推荐状态','开启推荐','关闭推荐','绑定','我的绑定','解绑','新手教程','传谱','确认传谱','取消传谱','传谱状态','传谱认证','传谱权限','撤销传谱权限','传谱权限列表'}<=found)
  def test_input_commands_do_not_send_incomplete_parameters(self):
-  needs={'查歌','等级','歌曲别名','谱面预览','谱面视频','单曲榜','查排名','绑定','绑定歌单','移除专辑','传谱','确认传谱','取消传谱','传谱状态','传谱权限','撤销传谱权限'}
+  needs={'查歌','等级','歌曲别名','谱面预览','谱面视频','单曲榜','查排名','绑定','绑定歌单','移除专辑','添加单曲','传谱','确认传谱','取消传谱','传谱状态','传谱权限','撤销传谱权限'}
   for page in PAGES:
    for b in self.buttons(page):
     command=command_parts(b['action']['data'])[0]
@@ -33,6 +33,9 @@ class MenuTests(unittest.TestCase):
     else:self.assertEqual(b['action']['enter'],command not in needs)
   self.assertIn('排行榜菜单',COMMANDS)
   self.assertIn('更多功能',COMMANDS)
+  for page in ('推荐菜单','歌单菜单'):
+   button=next(b for b in self.buttons(page) if b['render_data']['label']=='添加单曲')
+   self.assertEqual(button['action']['data'],'添加单曲 ')
  def test_delivery_and_category_specific_fallback(self):
   async def run(fail):
    calls=[]

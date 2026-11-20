@@ -14,7 +14,7 @@ def build(catalogue, rules, updated):
     for chart in catalogue['charts']:
         radar = chart.get('radar', {})
         grade = level(chart.get('display_level', chart.get('level')), chart.get('version', ''))
-        if grade is None or not 10 <= grade <= 15 or radar.get('algorithm') != rules['algorithm']:
+        if grade is None or not 0 < grade <= 15 or radar.get('algorithm') != rules['algorithm']:
             continue
         if not chart.get('server_hash') or not radar.get('raw_metrics'):
             raise ValueError('Missing chart provenance')
