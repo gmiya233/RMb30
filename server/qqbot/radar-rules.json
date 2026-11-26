@@ -1,6 +1,6 @@
 {
   "algorithm": "study-9-slide-volume-led-real-time",
-  "scale": "chart-references-v10-volume-led",
+  "scale": "chart-references-v11-volume-led",
   "axes": [
     "notes",
     "chord",
@@ -11,40 +11,31 @@
   ],
   "anchors": {
     "4": {
-      "notes": 3885,
-      "peak": 28.333333333333332,
+      "notes": 3800,
+      "peak": 30,
       "slide": 429.56670541794483,
       "hold": 2.238522727272748,
-      "speed": 567.2682824523944,
-      "chord": 210.0
+      "speed": 42,
+      "chord": 160
     },
     "5": {
-      "notes": 3885,
-      "peak": 33.05555555555556,
+      "notes": 4000,
+      "peak": 32,
       "slide": 429.56670541794483,
       "hold": 2.7278409090909244,
-      "chord": 58.00000000000001,
-      "speed": 0.8345938660641483
+      "chord": 180,
+      "speed": 42
     },
     "6": {
-      "notes": 3885,
-      "peak": 30.27777777777778,
+      "notes": 4200,
+      "peak": 36,
       "slide": 429.56670541794483,
-      "speed": 42.249657064471876,
+      "speed": 42,
       "hold": 3.621363636363645,
-      "chord": 198.6
+      "chord": 200
     }
   },
   "references": {
-    "notes": {
-      "title": "诸神黄昏 (Ragnarok)",
-      "cid": 604435,
-      "keys": 4,
-      "difficulty": "HD",
-      "target": 100,
-      "raw": 3885,
-      "package_sha256": "5073694777f53d205ae4d32f29c5d48c8388825c42d77e579d49db4bb924471a"
-    },
     "slide": {
       "title": "风纪委员／GOODRAGE 均值",
       "target": 100,

@@ -23,16 +23,17 @@ class CurrentCalibrationTests(unittest.TestCase):
                 self.assertTrue(math.isfinite(r['values'][i]))
             if r['source_format']=='IMD':self.assertEqual(r['values'][3],0)
 
-    def test_ragnarok_100_and_astronomas_real_time_reference(self):
+    def test_current_anchors_and_unchanged_slide_references(self):
         rows={r['cid']:r for r in self.doc['charts']}
         self.assertEqual(rows[604435]['raw_metrics']['notes'],3885)
-        self.assertEqual(rows[604435]['values'][0],100)
+        self.assertAlmostEqual(rows[604435]['values'][0],3885*100/3800)
         self.assertAlmostEqual(rows[604398]['values'][5],slide_strength(20.75,3049,332.9580000000015)/self.rules['anchors']['4']['slide']*100)
         self.assertAlmostEqual(rows[604401]['values'][5],slide_strength(24,1059,117.02597128378379)/self.rules['anchors']['4']['slide']*100)
         self.assertAlmostEqual((rows[604398]['values'][5]+rows[604401]['values'][5])/2,100)
-        self.assertEqual(rows[604332]['values'][3],90)
-        for anchors in self.rules['anchors'].values():
-            self.assertEqual(anchors['notes'],3885)
+        self.assertAlmostEqual(rows[604332]['values'][3],rows[604332]['raw_metrics']['speed']*100/42)
+        for keys, notes, chord, peak in [(4,3800,160,30),(5,4000,180,32),(6,4200,200,36)]:
+            anchors=self.rules['anchors'][str(keys)]
+            self.assertEqual((anchors['notes'],anchors['chord'],anchors['peak'],anchors['speed']),(notes,chord,peak,42))
             self.assertAlmostEqual(anchors['slide'],(slide_strength(20.75,3049,332.9580000000015)+slide_strength(24,1059,117.02597128378379))/2)
 
     def test_ratio_scale_does_not_cap(self):

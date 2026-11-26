@@ -18,8 +18,8 @@ public final class ChartRadarDataTest {
             if(data.level<10)low++;
             for(int k=0;k<6;k++){check(data.radius(k,0)==0,"animation starts at center");check(Math.abs(data.radius(k,.5f)*2-data.radius(k,1))<1e-5,"halfway geometry");check(data.radius(k,2)==data.radius(k,1),"animation clamps");}
             if(data.format.equals("IMD")){check(data.values[3]==0&&!data.hell(3),"IMD speed zero");imd++;}
-            if(data.cid==604435)check(data.values[0]==100,"Ragnarok notes reference");
-            if(data.cid==604332)check(Math.abs(data.values[3]-90)<1e-8,"New Astronomas speed reference is 90");
+            if(data.cid==604435)check(Math.abs(data.values[0]-3885*100.0/3800)<1e-8,"Ragnarok uses the 4K notes baseline");
+            if(data.cid==604332)check(Math.abs(data.values[3]-row.getJSONObject("raw_metrics").getDouble("speed")*100/42)<1e-8,"New Astronomas uses the shared speed baseline");
         }
         check(imd>0,"IMD coverage");check(low>0,"low-level asset coverage");JSONObject c=chart(rows.getJSONObject(0));fails(doc,"another server",c);
         JSONObject overflow=new JSONObject(doc.toString());JSONObject overflowRow=overflow.getJSONArray("charts").getJSONObject(0);check(!overflowRow.getString("source_format").equals("IMD"),"overflow fixture uses MC");overflowRow.getJSONArray("values").put(3,1000);
