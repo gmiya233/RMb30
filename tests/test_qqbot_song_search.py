@@ -41,7 +41,7 @@ class SongSearchTests(unittest.TestCase):
         result = self.search.execute('<@!123> 查歌 测试歌曲')
         self.assertIsInstance(result, bytes)
         image = Image.open(BytesIO(result))
-        self.assertEqual(image.size, (1200, 877))
+        self.assertEqual(image.size, (1200, 953))
         self.assertGreater(image.getpixel((100, 100))[0], 180)
         (Path(__file__).resolve().parents[1] / 'build' / 'qqbot-song-search-synthetic.png').write_bytes(result)
 
@@ -49,7 +49,27 @@ class SongSearchTests(unittest.TestCase):
         self.write([self.chart(), self.chart(cid=2, sid=2)])
         result = self.search.execute('查歌 测试歌曲')
         self.assertIsInstance(result, str)
-        self.assertIn('2 张谱面', result)
+        self.assertIn('2 首歌', result)
+
+    def test_curated_song_group_and_duplicate_cid(self):
+        self.write([
+            self.chart(cid=600144, sid=600100, title='RAMBLING BLAD', creator='GM1YA'),
+            self.chart(cid=604464, sid=601095, title='RAMBLING BLADE', creator='风翎'),
+            self.chart(cid=600037, sid=600029, title='Megaburn'),
+            self.chart(cid=600229, sid=600169, title='Megaburn'),
+            self.chart(cid=604370, sid=601004, title='Yooh - RPG_4k_hd', creator='死奏怜音'),
+            self.chart(cid=604481, sid=601107, title='RPG', creator='AnChenOwO'),
+        ])
+        from unittest.mock import patch
+        with patch('song_search.render', return_value=b'fixture') as renderer:
+            self.assertIsInstance(self.search.execute('查歌 RAMBLING BLADE'), bytes)
+            rows = renderer.call_args.args[0]
+            self.assertEqual([(r['cid'], r['creator']) for r in rows], [(604464, '风翎'), (600144, 'GM1YA')])
+            self.assertIsInstance(self.search.execute('查歌 600229'), bytes)
+            self.assertEqual([r['cid'] for r in renderer.call_args.args[0]], [600037])
+            self.assertIsInstance(self.search.execute('查歌 604370'), bytes)
+            rows = renderer.call_args.args[0]
+            self.assertEqual([(r['cid'], r['title']) for r in rows], [(604481, 'RPG'), (604370, 'RPG')])
 
     def test_hidden_results_do_not_prevent_unique_song(self):
         self.write([self.chart(), self.chart(cid=2, sid=2, search_visible=False)])

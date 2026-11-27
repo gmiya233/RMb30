@@ -5,7 +5,7 @@ Replay score field 4 is the zero-based Malody `JudgeLevel` enum (A=0 through
 E=4). Convert it once to the app's 1-based A–E indices for display and rating;
 keep the original field untouched in archives. A missing protobuf enum field
 defaults to A when other raw score fields are present; empty/invalid raw payloads
-remain unknown. Rating namespaces use `index-v2-zero-based-judge:` so snapshots
+remain unknown. Rating namespaces use `index-v3-c998-normalized:` so snapshots
 calculated with the old off-by-one interpretation cannot mix with corrected ones.
 It uses the same Java catalogue validation, rating, song grouping and tie rules
 as the Android client. Original history files and legacy v1 indices are read-only
@@ -132,3 +132,12 @@ systemd path drop-in, grant `ReadWritePaths` to the archive root's new
 Run `python3 -B /opt/malody-ranking/community.py --once` to validate publication
 before starting the service. The worker polls every five seconds, preserves
 last valid reviews across corrupt inputs/restarts, and publishes atomically.
+
+## Rating rules v3
+
+A/B/C/D/E multipliers are 0.97/0.985/1/1.02/1.04. The former accuracy curve
+is divided by 1.01 throughout, so C at 99.8% or above equals the normalized
+chart level. O20/N10 grouping and all source histories remain unchanged.
+New revision namespaces prevent old-rule summaries and best-score caches from
+mixing with recalculated boards. Rebuild from complete histories, not old B30
+shortlists, because the best judge/accuracy result may change.

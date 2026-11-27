@@ -19,6 +19,6 @@ public final class ChartKeys {
         if(supplement.optInt("schema")!=1||!server.equals(supplement.optString("server")))return;
         JSONArray rows=supplement.getJSONArray("charts");if(rows.length()>100000)throw new IllegalArgumentException("Key metadata too large");
         Map<Integer,JSONObject> byId=new HashMap<>();for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);byId.put(row.getInt("cid"),row);}
-        for(int i=0;i<charts.length();i++){JSONObject chart=charts.getJSONObject(i),row=byId.get(chart.optInt("cid"));if(row!=null&&chart.optString("server_hash").equals(row.optString("server_hash"))){int keys=row.optInt("keys");if(keys>=0&&keys<=64){chart.put("keys",keys);chart.put("keys_source",row.optString("keys_source"));}}}
+        for(int i=0;i<charts.length();i++){JSONObject chart=charts.getJSONObject(i),row=byId.get(chart.optInt("cid"));if(row!=null&&chart.optString("server_hash").equals(row.optString("server_hash"))){if(AccuracyRules.RULE.equals(row.optString("judgement_rule"))&&row.optLong("judgement_count")>0){chart.put("judgement_count",row.optLong("judgement_count"));chart.put("judgement_rule",row.optString("judgement_rule"));}int keys=row.optInt("keys");if(keys>=0&&keys<=64){chart.put("keys",keys);chart.put("keys_source",row.optString("keys_source"));}}}
     }
 }

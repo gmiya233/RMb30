@@ -1,3 +1,4 @@
+from song_buttons import SongCard, send_actions
 """A single-song search returns an illustrated card; ambiguous searches stay text."""
 from io import BytesIO
 from pathlib import Path
@@ -6,8 +7,22 @@ import re
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from b30_commands import command_parts
-from b30_data import identity, level
+from b30_data import level
 from ranking_queries import text
+from song_groups import DUPLICATE_CIDS, canonical_sid, display_title
+
+
+def song_key(row):
+    sid = row.get('sid', 0)
+    return ('sid', canonical_sid(sid)) if isinstance(sid, int) and sid > 0 else ('cid', row['cid'])
+
+
+def song_results(groups):
+    lines = [f'找到 {len(groups)} 首歌（共 {sum(map(len, groups.values()))} 张谱面，展示前8首）']
+    for rows in list(groups.values())[:8]:
+        row = rows[0]
+        lines.append(f"{row['cid']} · {text(row.get('title', '未命名'), 55)} · {len(rows)} 张谱面")
+    return '\n'.join(lines + ['发送「查歌 谱面ID」查看这首歌的全部谱面及谱师。'])
 
 
 def artwork(rows, roots):
@@ -39,6 +54,15 @@ def load_rankings(queries, rows):
             boards[chart['cid']] = {'rows': ranked[:5], 'count': len(ranked), 'stamp': stamp}
         except (OSError, ValueError, TypeError, KeyError, AttributeError):
             boards[chart['cid']] = None
+    from song_card_art import assets_ready, load_board_avatars
+    if assets_ready():
+        try:
+            avatars = load_board_avatars(queries, boards)
+        except (OSError, ValueError, TypeError, AttributeError):
+            avatars = {}
+        for board in boards.values():
+            if board is not None:
+                board['avatars'] = avatars
     return boards
 
 
@@ -46,7 +70,7 @@ def section_height(board):
     return 142 + 58 * max(1, len(board['rows']) if board else 0)
 
 
-def render(rows, font_path, roots, boards=None):
+def _render(rows, font_path, roots, boards=None, heading="小师妹 · 歌曲信息"):
     shown = rows[:12]
     boards = boards or {}
     width, height = 1200, 477 + sum(section_height(boards.get(row['cid'])) for row in shown)
@@ -68,7 +92,7 @@ def render(rows, font_path, roots, boards=None):
         draw.rounded_rectangle((52, 58, 332, 338), radius=20, fill='#d9f1ee')
         label(116, 177, '暂无曲绘', 30, '#667e8b', 210)
     first = rows[0]
-    label(364, 58, '小师妹 · 歌曲信息', 24, '#087b87', 770)
+    label(364, 58, heading, 24, '#087b87', 770)
     label(364, 111, first.get('title') or '未命名', 42, limit=770)
     label(364, 190, '歌手：' + (first.get('artist') or '未知'), 28, limit=770)
     label(364, 237, 'BPM：' + str(first.get('bpm') or '未知'), 28, limit=770)
@@ -83,7 +107,8 @@ def render(rows, font_path, roots, boards=None):
         value = level(row.get('level'), row.get('version'))
         label(48, y + 18, f'ID {row["cid"]}', 25, '#087b87', 220)
         label(274, y + 18, f'Lv.{value:g}' if value is not None else '等级待定', 25, '#aa43bf', 170)
-        label(460, y + 18, row.get('version') or '未命名难度', 25, limit=690)
+        label(460, y + 18, row.get('version') or '未命名难度', 25, limit=340)
+        label(820, y + 18, '谱师：' + str(row.get('creator') or '未知'), 21, limit=330)
         if board and board['rows']:
             columns = [(48, '名次'), (132, '玩家'), (430, '成绩'), (651, '准度'), (844, '判定'), (974, 'rating')]
             for x, title in columns:
@@ -110,6 +135,19 @@ def render(rows, font_path, roots, boards=None):
     return output.getvalue()
 
 
+def render(rows, font_path, roots, boards=None, heading='小师妹 · 歌曲信息'):
+    from song_aliases import append_aliases
+    from song_card_art import assets_ready, render_card
+    if assets_ready():
+        cover = artwork(rows, roots)
+        try:
+            return render_card(rows, cover, boards or {}, heading)
+        finally:
+            if cover is not None:
+                cover.close()
+    return append_aliases(_render(rows, font_path, roots, boards, heading), rows, font_path)
+
+
 class SongSearch:
     def __init__(self, queries, font, artwork_roots):
         self.queries, self.font, self.roots = queries, font, artwork_roots
@@ -120,14 +158,30 @@ class SongSearch:
             return self.queries.execute(content)
         try:
             matched = self.queries.search(arg)
-            songs = {identity(row) for row in matched}
-            if len(songs) != 1:
+            if not matched:
                 return self.queries.execute(content)
-            selected = next(iter(songs))
-            rows = sorted((row for row in self.queries.catalogue()[1].values()
-                           if row.get('search_visible', True) is True and identity(row) == selected),
-                          key=lambda row: row['cid'])
-            return render(rows, self.font, self.roots, load_rankings(self.queries, rows))
+            groups = {song_key(row): [] for row in matched}
+            catalogue = self.queries.catalogue()[1]
+            for row in catalogue.values():
+                key = song_key(row)
+                if key not in groups or row.get('search_visible', True) is not True:
+                    continue
+                kept = catalogue.get(DUPLICATE_CIDS.get(row['cid']))
+                if kept and kept.get('search_visible', True) is True:
+                    continue
+                groups[key].append(dict(row, title=display_title(row.get('sid'), row.get('title'))))
+            for key, rows in groups.items():
+                rows.sort(key=lambda row: (row.get('sid') != key[1], row['cid']))
+            groups = {key: rows for key, rows in groups.items() if rows}
+            if len(groups) != 1:
+                return song_results(groups) if groups else self.queries.execute(content)
+            rows = next(iter(groups.values()))
+            try:
+                return SongCard(render(rows, self.font, self.roots, load_rankings(self.queries, rows)), rows)
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                return '\n'.join([text(rows[0]['title'], 60)] + [
+                    f"{row['cid']} · {text(row.get('version') or '未定难度', 35)} · 谱师 {text(row.get('creator') or '未知', 35)}"
+                    for row in rows[:12]])
         except (OSError, ValueError, TypeError, KeyError, AttributeError):
             # Metadata/image failures should not suppress useful search results.
             return self.queries.execute(content)

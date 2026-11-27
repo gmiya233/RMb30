@@ -12,7 +12,7 @@ public final class ReadOnlyService extends Binder {
     public void destroy(){System.exit(0);}
     private static File allowed(String path)throws IOException {
         File file=new File(path).getCanonicalFile();String p=file.getPath();
-        String lower=p.toLowerCase(Locale.ROOT);boolean chartFile=p.startsWith(ROOT+"/chart/")&&(lower.endsWith(".mc")||lower.endsWith(".jpg")||lower.endsWith(".jpeg")||lower.endsWith(".png")||lower.endsWith(".webp"));
+        String lower=p.toLowerCase(Locale.ROOT);boolean chartFile=p.startsWith(ROOT+"/chart/")&&(lower.endsWith(".mc")||lower.endsWith(".imd")||lower.endsWith(".ogg")||lower.endsWith(".mp3")||lower.endsWith(".wav")||lower.endsWith(".m4a")||lower.endsWith(".jpg")||lower.endsWith(".jpeg")||lower.endsWith(".png")||lower.endsWith(".webp"));
         if(!chartFile&&!(p.startsWith(ROOT+"/replay/")&&p.endsWith(".mrv")))throw new SecurityException("只允许读取 Malody 谱面、曲绘和回放");
         return file;
     }

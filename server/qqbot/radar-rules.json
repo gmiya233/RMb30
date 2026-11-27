@@ -1,0 +1,80 @@
+{
+  "algorithm": "study-9-slide-volume-led-real-time",
+  "scale": "chart-references-v11-volume-led",
+  "axes": [
+    "notes",
+    "chord",
+    "peak",
+    "speed",
+    "hold",
+    "slide"
+  ],
+  "anchors": {
+    "4": {
+      "notes": 3800,
+      "peak": 30,
+      "slide": 429.56670541794483,
+      "hold": 2.238522727272748,
+      "speed": 42,
+      "chord": 160
+    },
+    "5": {
+      "notes": 4000,
+      "peak": 32,
+      "slide": 429.56670541794483,
+      "hold": 2.7278409090909244,
+      "chord": 180,
+      "speed": 42
+    },
+    "6": {
+      "notes": 4200,
+      "peak": 36,
+      "slide": 429.56670541794483,
+      "speed": 42,
+      "hold": 3.621363636363645,
+      "chord": 200
+    }
+  },
+  "references": {
+    "slide": {
+      "title": "风纪委员／GOODRAGE 均值",
+      "target": 100,
+      "raw": 429.56670541794483,
+      "window_seconds": 4,
+      "method": "arithmetic-mean-of-volume-led-real-time-strength",
+      "profiles": [
+        {
+          "title": "(风纪委员)ジャッジメントですのっ",
+          "cid": 604398,
+          "keys": 4,
+          "difficulty": "HD",
+          "raw": 20.75,
+          "source_sha256": "99d7ad79ba28766991ff1d6e39586d64921b6f95e6facbf9a20ab465d238605d",
+          "points": 3049,
+          "density": 20.75,
+          "strength": 579.3828039192235,
+          "duration_seconds": 332.9580000000015,
+          "average_density": 9.157311132334968
+        },
+        {
+          "title": "GOODRAGE",
+          "cid": 604401,
+          "keys": 4,
+          "difficulty": "HD",
+          "raw": 24,
+          "source_sha256": "c3d227bb201f9dfc562670b4c6fd27ce71b1d81d1183009a3736ea173cb08127",
+          "points": 1059,
+          "density": 24,
+          "strength": 279.75060691666613,
+          "duration_seconds": 117.02597128378379,
+          "average_density": 9.049273322688029
+        }
+      ],
+      "weights": {
+        "volume": 0.7,
+        "average_density": 0.2,
+        "peak_density": 0.1
+      }
+    }
+  }
+}
