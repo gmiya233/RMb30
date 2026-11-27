@@ -1,5 +1,5 @@
 from song_buttons import SongCard, send_actions
-"""Random song cards and persistent, opt-in two-hour group schedules."""
+"""Random song cards and hourly group schedules for charts and the overall leaderboard."""
 import json
 from pathlib import Path
 import random
@@ -12,12 +12,19 @@ from song_search import render, load_rankings, artwork
 
 INTERVAL = 3600
 BEIJING = timezone(timedelta(hours=8))
-QUIET_TEXT = '北京时间00:00～10:00不主动推歌'
+QUIET_START = 21
+QUIET_END = 10
+QUIET_TEXT = '北京时间21:00～次日10:00暂停自动推荐'
 COMMANDS = {'歌曲推荐','随机推荐','推荐歌曲','开启推荐','关闭推荐','推荐状态'}
 
 def next_push_time(value):
-    local=datetime.fromtimestamp(value,BEIJING)
-    return local.replace(hour=10,minute=0,second=0,microsecond=0).timestamp() if local.hour<10 else value
+    local = datetime.fromtimestamp(value, BEIJING)
+    if QUIET_END <= local.hour < QUIET_START:
+        return value
+    resume = local.replace(hour=QUIET_END, minute=0, second=0, microsecond=0)
+    if local.hour >= QUIET_START:
+        resume += timedelta(days=1)
+    return resume.timestamp()
 
 def enable_failure_hint(error):
     # botpy 1.2.1 labels unrecognized HTTP statuses ServerError, including 400;
@@ -41,10 +48,15 @@ class Recommendations:
         with closing(sqlite3.connect(self.path)) as db, db:
             columns={r[1] for r in db.execute('PRAGMA table_info(recommendations)')}
             if 'next_kind' not in columns:
-                db.execute("ALTER TABLE recommendations ADD COLUMN next_kind TEXT NOT NULL DEFAULT 'music'")
+                db.execute("ALTER TABLE recommendations ADD COLUMN next_kind TEXT NOT NULL DEFAULT 'rating'")
                 db.execute("ALTER TABLE recommendations ADD COLUMN dispatch_kind TEXT NOT NULL DEFAULT 'chart'")
                 for group,due in db.execute('SELECT group_id,next_due FROM recommendations WHERE enabled=1').fetchall():
                     db.execute('UPDATE recommendations SET next_due=? WHERE group_id=?',(next_push_time(max(self.clock()+60,due-3600)),group))
+            # Preserve each enabled group and its due time when replacing legacy music slots.
+            db.execute("""UPDATE recommendations
+                          SET next_kind=CASE next_kind WHEN 'music' THEN 'rating' ELSE next_kind END,
+                              dispatch_kind=CASE dispatch_kind WHEN 'music' THEN 'rating' ELSE dispatch_kind END
+                          WHERE next_kind='music' OR dispatch_kind='music'""")
         self.path.chmod(0o600)
 
     def history(self, group):
@@ -77,12 +89,20 @@ class Recommendations:
         card.preview_charts=tuple((row['cid'],row.get('server_hash','')) for row in rows)
         return card
 
+    def scheduled_card(self, group):
+        if self.kind(group) == 'rating':
+            image = self.queries.execute('总榜')
+            if not isinstance(image, bytes):
+                raise ValueError('总战力榜图片暂不可用')
+            return image, '小师妹 · 总战力榜更新啦！'
+        return self.card(group), None
+
     def enable(self,group):
         now=self.clock();due=next_push_time(now if self.quiet() else now+INTERVAL)
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('INSERT OR IGNORE INTO recommendations(group_id) VALUES (?)',(group,))
-            db.execute("UPDATE recommendations SET enabled=1,next_kind=?,next_due=?,status=? WHERE group_id=?",('chart' if self.quiet() else 'music',due,'已开启',group))
-        return '选曲任务交给小师妹啦！已开启每小时交替推送谱面和音乐，'+QUIET_TEXT+'。下一次：'+self.stamp(due)+'。'+('现在是休息时间，10点后再尝试推送；是否发送成功以QQ平台确认为准。' if self.quiet() else '想暂停时，发送“关闭推荐”就好～')
+            db.execute("UPDATE recommendations SET enabled=1,next_kind=?,next_due=?,status=? WHERE group_id=?",('chart' if self.quiet() else 'rating',due,'已开启',group))
+        return '选曲任务交给小师妹啦！已开启每小时交替推送谱面和总战力榜，'+QUIET_TEXT+'。下一次：'+self.stamp(due)+'。'+('现在是休息时间，10点后再尝试推送；是否发送成功以QQ平台确认为准。' if self.quiet() else '想暂停时，发送“关闭推荐”就好～')
 
     def quiet(self):
         now=self.clock()
@@ -96,7 +116,7 @@ class Recommendations:
     def disable(self,group):
         with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('UPDATE recommendations SET enabled=0,status=? WHERE group_id=?',('已关闭',group))
-        return '本群自动歌曲推荐已关闭，小师妹先把选曲本收好啦～想临时抽一首，随时发送“歌曲推荐”！'
+        return '本群自动推送已关闭，小师妹先把选曲本收好啦～想临时抽一首，随时发送“歌曲推荐”！'
 
     @staticmethod
     def stamp(value):
@@ -105,8 +125,8 @@ class Recommendations:
     def status(self,group):
         with closing(sqlite3.connect(self.path)) as db:
             row=db.execute('SELECT enabled,next_due,status,next_kind FROM recommendations WHERE group_id=?',(group,)).fetchone()
-        if not row or not row[0]: return '本群自动推荐未开启。想让小师妹帮忙选曲吗？发送“开启推荐”启用每小时交替推荐，或发送“歌曲推荐”马上抽一首～'
-        return '小师妹的选曲日程来啦！本群每小时交替推荐已开启，'+QUIET_TEXT+'。下一次：'+self.stamp(next_push_time(max(row[1],self.clock())))+'（'+('音乐' if row[3]=='music' else '谱面')+'）；最近状态：'+row[2]
+        if not row or not row[0]: return '本群自动推荐未开启。想让小师妹帮忙选曲吗？发送“开启推荐”启用谱面和总战力榜交替推送，或发送“歌曲推荐”马上抽一首～'
+        return '小师妹的选曲日程来啦！本群每小时交替推送谱面和总战力榜，'+QUIET_TEXT+'。下一次：'+self.stamp(next_push_time(max(row[1],self.clock())))+'（'+('总战力榜' if row[3]=='rating' else '谱面')+'）；最近状态：'+row[2]
 
     def due(self, allowed):
         now=self.clock()
@@ -119,7 +139,7 @@ class Recommendations:
             groups=[r[0] for r in db.execute('SELECT group_id FROM recommendations WHERE enabled=1 AND next_due<=?',(now,)) if not allowed or r[0] in allowed]
             # Reserve the next slot before I/O. Restarts/failures never cause catch-up floods.
             for group in groups:
-                db.execute("UPDATE recommendations SET dispatch_kind=next_kind,next_kind=CASE next_kind WHEN 'music' THEN 'chart' ELSE 'music' END,next_due=?,status=? WHERE group_id=?",(next_push_time(now+INTERVAL),'正在发送',group))
+                db.execute("UPDATE recommendations SET dispatch_kind=next_kind,next_kind=CASE next_kind WHEN 'rating' THEN 'chart' ELSE 'rating' END,next_due=?,status=? WHERE group_id=?",(next_push_time(now+INTERVAL),'正在发送',group))
         return groups
 
     def finish(self,group,ok):

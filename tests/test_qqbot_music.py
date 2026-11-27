@@ -55,7 +55,7 @@ class MusicTests(unittest.TestCase):
    args=(None,'unused',[],Path(tmp)/'r.db')
    r=Recommendations(*args,clock=lambda:now[0]);r.enable('g')
    self.assertEqual(INTERVAL,3600)
-   now[0]+=3600;self.assertEqual(r.due(set()),['g']);self.assertEqual(r.kind('g'),'music')
+   now[0]+=3600;self.assertEqual(r.due(set()),['g']);self.assertEqual(r.kind('g'),'rating')
    r=Recommendations(*args,clock=lambda:now[0]);now[0]+=3600;r.due(set());self.assertEqual(r.kind('g'),'chart')
    now[0]=datetime(2026,11,13,2,tzinfo=ZoneInfo('Asia/Shanghai')).timestamp();self.assertEqual(r.due(set()),[])
 

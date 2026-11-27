@@ -57,7 +57,8 @@ def main():
     credential = Path(os.environ['CREDENTIALS_DIRECTORY']) / 'appsecret'
     secret = credential.read_text().strip()
     assert secret and str(config['appid']).isdigit()
-    queries = Queries(config['rankings'], config['catalogue'])
+    queries = Queries(config['rankings'], config['catalogue'], rating_images=True)
+    queries.ranking_artwork = [config.get('artwork', '/var/lib/malody-qqbot/artwork'), Path(config['catalogue']).parent / 'thumbs']
     from song_aliases import SongAliases
     queries.alias_store = SongAliases(Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'song-aliases.sqlite3')
     b30 = B30Commands(queries, Path(os.environ.get('STATE_DIRECTORY', '/var/lib/malody-qqbot')) / 'bindings.sqlite3',
@@ -86,19 +87,26 @@ def main():
     chart_voice.slot = music_voice.slot
 
     class Client(botpy.Client):
-        async def send_card(self, group, image, message_id=None):
+        async def send_card(self, group, image, message_id=None, *, caption=None):
             from botpy.http import Route
+            if not message_id and recommendations.quiet():
+                return False
             if not 0 < len(image) <= 4 * 1024 * 1024:
                 raise ValueError('Image exceeds upload limit')
             media = await self.http.request(Route('POST', '/v2/groups/{group_openid}/files', group_openid=group),
                 json={'file_type':1, 'file_data':base64.b64encode(image).decode('ascii'), 'srv_send_msg':False})
             if not isinstance(media,dict) or not media.get('file_info'):
                 raise TimeoutError('Image upload acknowledgement missing')
-            payload={'msg_type':7, 'content':' ', 'media':{'file_info':media['file_info']}}
+            # Rendering/upload may cross midnight; check again before sending.
+            if not message_id and recommendations.quiet():
+                return False
+            payload={'msg_type':7, 'content':'小师妹的选曲时间到！这次来挑战图里这首吧～', 'media':{'file_info':media['file_info']}}
             if hasattr(image,'music'):
                 from ranking_queries import text as clean_text
                 song=image.music
                 payload['content']='小师妹 · 音乐推荐\n'+clean_text(song['title'],100)+' — '+clean_text(song['artist'],100)+'\nhttps://y.qq.com/n/ryqq_v2/songDetail/'+song['mid']
+            if caption is not None:
+                payload['content'] = caption
             if message_id: payload.update(msg_id=message_id,msg_seq=1)
             result=await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=payload)
             if not isinstance(result,dict) or not result.get('id'):
@@ -106,8 +114,11 @@ def main():
             if hasattr(image,'music'):
                 await asyncio.to_thread(music_recommendations.delivered,group,image.music['mid'])
             async def send_song_actions(data):
+                if not message_id and recommendations.quiet():
+                    return None
                 return await self.http.request(Route('POST','/v2/groups/{group_openid}/messages',group_openid=group),json=data)
-            await send_actions(send_song_actions, image, message_id)
+            if message_id or not recommendations.quiet():
+                await send_actions(send_song_actions, image, message_id)
             if hasattr(image,'music'):
                 async def audio_request(endpoint,data):
                     return await self.http.request(Route('POST','/v2/groups/{group_openid}/'+endpoint,group_openid=group),json=data)
@@ -167,10 +178,11 @@ def main():
                         ok=False
                         try:
                             async with slots:
-                                choose_music=await asyncio.to_thread(recommendations.kind,group) == 'music'
-                                maker=music_recommendations.card if choose_music else recommendations.card
-                                image=await asyncio.wait_for(asyncio.to_thread(maker,group),timeout=30)
-                                await self.send_card(group,image)
+                                image, caption = await asyncio.wait_for(
+                                    asyncio.to_thread(recommendations.scheduled_card, group), timeout=30)
+                                if not await self.send_card(group,image,caption=caption):
+                                    await asyncio.to_thread(recommendations.defer,group)
+                                    continue
                                 ok=True
                                 print('Scheduled recommendation: accepted',flush=True)
                         except Exception as error:
@@ -225,6 +237,10 @@ def main():
                         elif command == '推荐状态':
                             reply=await asyncio.to_thread(recommendations.status,group)
                         elif command == '开启推荐':
+                            if recommendations.quiet():
+                                reply=await asyncio.to_thread(recommendations.enable,group)
+                                await self.api.post_group_message(group_openid=group,msg_type=0,msg_id=message.id,content='\n'+reply)
+                                return
                             # Send without msg_id to verify real proactive delivery first.
                             try:
                                 image=await asyncio.wait_for(asyncio.to_thread(recommendations.card,group),timeout=30)

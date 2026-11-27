@@ -11,6 +11,12 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
+RATING_BOARD_COMMANDS = {'总榜', 'rt榜', '战力榜'}
+SIX_BOARD_COMMANDS = {'6k榜', '6k排行', '6k排行榜'}
+ACTIVITY_BOARD_COMMANDS = {'活跃榜', '活跃度排行', '累计活跃榜', '月活跃榜'}
+BOARD_IMAGE_COMMANDS = RATING_BOARD_COMMANDS | SIX_BOARD_COMMANDS | ACTIVITY_BOARD_COMMANDS | {'单曲榜'}
+
+
 class Unavailable(ValueError):
     pass
 
@@ -56,7 +62,7 @@ class Queries:
             '单曲榜 谱面ID [页码]：单谱排行\n'
             '单曲榜 歌名：先搜索，再选择谱面ID\n'
             '歌曲推荐：随机推荐曲绘、BPM、难度和排行\n'
-            '开启推荐 / 关闭推荐 / 推荐状态：本群每2小时推荐\n'
+            '开启推荐 / 关闭推荐 / 推荐状态：本群每小时交替推送谱面和总榜\n'
             '6K榜：6K单独计算 O20+N10\n'
             '6kb30 / 6K B30：已绑定QQ的6K专属成绩图\n'
             '活跃榜 累计/月 [页码]：云端游玩次数\n'
@@ -86,9 +92,10 @@ class Queries:
         '在 App 上传成绩后，发送 b30 就能查看已绑定QQ的成绩图～'
     )
 
-    def __init__(self, root, catalogue, clock=time.time):
+    def __init__(self, root, catalogue, clock=time.time, *, rating_images=False):
         self.root, self.catalogue_file = Path(root), Path(catalogue)
         self.clock = clock
+        self.rating_images = rating_images
         self._signature, self._catalogue = None, None
 
     def catalogue(self):
@@ -222,6 +229,15 @@ class Queries:
             raise ValueError(f'共{pages}页，请选择有效页码。')
         return rows[(page - 1) * 10:page * 10], f'第{page}/{pages}页 · {len(rows)}人'
 
+    def board_image(self, rows, page, stamp, **style):
+        if self.rating_images:
+            from rating_board_image import render
+            try:
+                return render(self, rows, page, stamp, **style)
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                pass
+        return None
+
     def execute(self, content):
         content = re.sub(r'<@!?\d+>', '', str(content)).strip().lstrip('/').strip()
         if len(content) > 200:
@@ -250,21 +266,31 @@ class Queries:
                 return self.HELP
             if command.casefold() in ('rating', 'rating说明', 'rating规则'):
                 return self.rating_help()
-            if command.casefold() in ('6k榜','6k排行','6k排行榜'):
+            if command.casefold() in SIX_BOARD_COMMANDS:
                 rows,stamp=self.board(six=True)
                 selected,page=self.page(rows,arg or '1')
+                image = self.board_image(selected, page, stamp, title='6K 战力榜', six=True)
+                if image is not None:
+                    return image
                 return '\n'.join(['6K 综合 rating 榜 · O20+N10',page]+[f"{r['rank']}. {r['name']} · {r['rating']:.4f}\n   O20 {r['o']:.4f} · N10 {r['n']:.4f}" for r in selected]+[stamp,'仅计算已确认6K谱面，缺位按0计。'])
-            if command in ('活跃榜','活跃度排行','累计活跃榜','月活跃榜'):
+            if command in ACTIVITY_BOARD_COMMANDS:
                 values=arg.split();monthly=command=='月活跃榜'
                 if values and values[0] in ('月','月榜','近30天','累计','总榜'):
                     monthly=values.pop(0) in ('月','月榜','近30天')
                 if len(values)>1: return '用法：活跃榜 累计/月 [页码]'
                 rows,stamp=self.activity(monthly)
                 selected,page=self.page(rows,values[0] if values else '1')
+                image = self.board_image(selected, page, stamp,
+                                         title='近 30 天活跃榜' if monthly else '累计活跃榜', activity=True)
+                if image is not None:
+                    return image
                 return '\n'.join(['近30天活跃榜' if monthly else '累计活跃榜',page]+[f"{r['rank']}. {r['name']} · {r['count']:,}次" for r in selected]+[stamp,'按云端去重后的有效游玩记录统计，未上传的记录不计。'])
-            if command in ('总榜', 'rt榜', '战力榜'):
+            if command.casefold() in RATING_BOARD_COMMANDS:
                 rows, stamp = self.board()
                 selected, page = self.page(rows, arg or '1')
+                image = self.board_image(selected, page, stamp)
+                if image is not None:
+                    return image
                 return '\n'.join(['综合 rating 榜 · O20+N10', page] + [f"{r['rank']}. {r['name']} · {r['rating']:.4f}" for r in selected] + [stamp])
             if command == '查排名':
                 if not re.fullmatch('[1-9][0-9]{4,11}', arg):
@@ -291,6 +317,9 @@ class Queries:
                     return '谱面ID不在当前谱库，请先发送“查歌 歌名”。'
                 rows, stamp = self.board(cid)
                 selected, page = self.page(rows, values[1] if len(values) == 2 else '1')
+                image = self.board_image(selected, page, stamp, title='单曲榜', chart=chart)
+                if image is not None:
+                    return image
                 heading = [f"{text(chart.get('title', '未命名'), 45)} · {text(chart.get('version', ''), 28)}", f'谱面ID {cid} · {page}']
                 lines = [f"{r['rank']}. {r['name']} · rating {r['rating']:.4f}\n   {r['accuracy']:.3f}% · {r['score']:,} · {('未知判定' if not r['judge'] else 'ABCDE'[r['judge']-1]+'判')}" for r in selected]
                 return '\n'.join(heading + (lines or ['暂无成绩']) + [stamp])

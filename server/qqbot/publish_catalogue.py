@@ -17,6 +17,21 @@ def creator_filter():
     return module.creator_visible
 
 
+def normalize_catalogue_titles(doc):
+    """Remove the RM filename tag from display titles and keep the old name searchable."""
+    charts = []
+    for row in doc['charts']:
+        original = row.get('title')
+        title = re.sub(r'(?i)\s*_4k_hd\s*$', '', original) if isinstance(original, str) else original
+        if title and title != original:
+            names = list(row.get('search_names') or [])
+            if original not in names:
+                names.append(original)
+            row = dict(row, title=title, search_names=names)
+        charts.append(row)
+    return dict(doc, charts=charts)
+
+
 def public_catalogue(doc):
     visible = creator_filter()
     fields = ('cid', 'sid', 'title', 'version', 'artist', 'creator', 'level', 'bpm', 'mode', 'promote', 'server_hash', 'search_names', 'judgement_count', 'judgement_rule', 'keys', 'radar')
@@ -92,6 +107,7 @@ def main():
         radar_supplement(doc['charts'], chart_source, target.parent / 'radar-cache.json', atomic)
     from public_artwork import publish
     publish(doc, target, atomic)
+    doc = normalize_catalogue_titles(doc)
     public = public_catalogue(doc)
     data = json.dumps(public, ensure_ascii=False, separators=(',', ':')).encode()
     if not target.exists() or target.read_bytes() != data:
